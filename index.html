@@ -1,0 +1,1231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Namma BMTC Mitra | AI & Offline Route Finder</title>
+
+    <!-- Tailwind CSS for utility classes -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- React & Babel for in-browser JSX transpilation -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- Embedded CSS -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            scroll-behavior: smooth;
+            background-color: #F9FAFB;
+        }
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #d1d5db;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #9ca3af;
+        }
+        input:focus {
+          outline: none;
+          box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.4);
+          border-color: #ef4444;
+        }
+        @keyframes spin {
+          to {
+            transform: rotate(360deg);
+          }
+        }
+        .animate-spin {
+          animation: spin 1s linear infinite;
+        }
+    </style>
+</head>
+<body>
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <div id="root"></div>
+
+    <!-- Your React application code, embedded directly -->
+    <script type="text/babel">
+        // --- Icon Components ---
+        const Icon = ({ size = 24, className = '', children }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>{children}</svg>
+        );
+        const MapPin = (props) => <Icon {...props}><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></Icon>;
+        const ArrowRight = (props) => <Icon {...props}><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></Icon>;
+        const Bus = (props) => <Icon {...props}><path d="M8 6v6"/><path d="M16 6v6"/><path d="M2 12h19.6"/><path d="M18 18h3s.5-1.7.8-2.8c.1-.4.2-.8.2-1.2 0-.4-.1-.8-.2-1.2l-1.4-5C20.1 6.8 19.1 6 18 6H4a2 2 0 0 0-2 2v10h3"/><circle cx="7" cy="18" r="2"/><path d="M9 18h5"/><circle cx="16" cy="18"r="2"/></Icon>;
+        const Search = (props) => <Icon {...props}><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></Icon>;
+        const AlertTriangle = (props) => <Icon {...props}><path d="m21.73 18-8-14a2 2 0 0 0-3.46 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></Icon>;
+        const GitCommit = (props) => <Icon {...props}><circle cx="12" cy="12" r="3"/><path d="M3 12h6"/><path d="M15 12h6"/></Icon>;
+        const Loader2 = (props) => <Icon {...props} className="animate-spin"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></Icon>;
+        const BrainCircuit = (props) => <Icon {...props}><path d="M12 5a3 3 0 1 0-5.997.004A3 3 0 0 0 12 5m0 0a3 3 0 1 0 5.997.004A3 3 0 0 0 12 5m0 0v7m-6-7h.01M18 5h-.01"/><path d="M12 12a3 3 0 1 0-5.997.004A3 3 0 0 0 12 12m0 0a3 3 0 1 0 5.997.004A3 3 0 0 0 12 12m0 0v7m-6-7h.01M18 12h-.01"/><path d="M12 19a3 3 0 1 0-5.997.004A3 3 0 0 0 12 19m0 0a3 3 0 1 0 5.997.004A3 3 0 0 0 12 19m0 0v.01M6 19h.01M18 19h-.01"/><path d="M6 5a2.5 2.5 0 0 1 0 5"/><path d="M18 5a2.5 2.5 0 0 0 0 5"/><path d="M6 12a2.5 2.5 0 0 1 0 5"/><path d="M18 12a2.5 2.5 0 0 0 0 5"/></Icon>;
+        const XCircle = (props) => <Icon {...props}><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></Icon>;
+        const Database = (props) => <Icon {...props}><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5V19A9 3 0 0 0 21 19V5"/><path d="M3 12A9 3 0 0 0 21 12"/></Icon>;
+
+        // --- OFFLINE CACHE DATABASE ---
+        const bmtcData = {
+          routes: [
+            { id: 'r1', busNumber: '315B', type: 'Ordinary', stops: ['Majestic', 'A Narayanapura'], platform: '17', farePerStage: 5 },
+            { id: 'r2', busNumber: '212D', type: 'Ordinary', stops: ['Majestic', 'Banashankari', 'Sarakki', 'Konanankunte'], platform: '11', farePerStage: 5 },
+            { id: 'r3', busNumber: '359A', type: 'Ordinary', stops: ['Majestic', 'Bommanahalli', 'Adigondanahalli'], platform: '15', farePerStage: 5 },
+            { id: 'r4', busNumber: '364F', type: 'Ordinary', stops: ['Majestic', 'Jayadeva', 'Bannerghatta Road', 'Arekere'], platform: '15', farePerStage: 5 },
+            { id: 'r5', busNumber: '271A', type: 'Ordinary', stops: ['Majestic', 'Central', 'Malleshwaram', 'Tata Inst.', 'Abbigere'], platform: '22', farePerStage: 6 },
+            { id: 'r6', busNumber: '165G', type: 'Ordinary', stops: ['Majestic', 'KH Road', 'Wilson Garden', 'Hosur Road', 'Adugodi'], platform: '14', farePerStage: 5 },
+            { id: 'r7', busNumber: '165E', type: 'Ordinary', stops: ['Majestic', 'Adugodi Police Quarters'], platform: '14', farePerStage: 5 },
+            { id: 'r8', busNumber: '369F', type: 'Ordinary', stops: ['Majestic', 'AECS Dental Colgs'], platform: '15', farePerStage: 5 },
+            { id: 'r9', busNumber: '333B', type: 'Ordinary', stops: ['Majestic', 'Richmond Road', 'AECS Layout'], platform: '17', farePerStage: 5 },
+            { id: 'r10', busNumber: '348F, 348E', type: 'Ordinary', stops: ['Majestic', 'JC Road', 'Lalbagh Main Gate', 'Dairy Circle', 'Agara'], platform: '15', farePerStage: 5 },
+            { id: 'r11', busNumber: '333J', type: 'AC Vajra', stops: ['Majestic', 'Richmond Road', 'Mayohall', 'Airport'], platform: '17', farePerStage: 10 },
+            { id: 'r12', busNumber: '290D', type: 'Ordinary', stops: ['Majestic', 'Cant Rly Station', 'Ambedkar Colg'], platform: '19', farePerStage: 5 },
+            { id: 'r13', busNumber: 'S33K', type: 'Ordinary', stops: ['Majestic', 'Richmond Road', 'M.G. Road', 'Ambedkar Nagar'], platform: '17', farePerStage: 5 },
+            { id: 'r14', busNumber: '319J', type: 'Ordinary', stops: ['Majestic', 'Richmond Road', 'M.G. Road', 'Ambedkar Nagar'], platform: '17', farePerStage: 5 },
+            { id: 'r15', busNumber: '115', type: 'Ordinary', stops: ['Majestic', 'KG Road', 'RT Nagar', 'Matadahalli', 'Ananda Nagar'], platform: '25', farePerStage: 5 },
+            { id: 'r16', busNumber: '356D', type: 'Ordinary', stops: ['Majestic', 'JC Road', 'St. Johns', 'Dairy Circle', 'Jayadeva', 'Anantha Nagar'], platform: '15', farePerStage: 5 },
+            { id: 'r17', busNumber: '402F', type: 'Ordinary', stops: ['Majestic', 'Anand Rao Circle', 'Shivananda', 'Ananthapura'], platform: '23', farePerStage: 6 },
+            { id: 'r18', busNumber: '263F', type: 'Ordinary', stops: ['Majestic', 'Central', 'Malleshwaram', 'Tata Inst.', 'Andrahalli'], platform: '20', farePerStage: 6 },
+            { id: 'r19', busNumber: '215N', type: 'Ordinary', stops: ['Majestic', 'NR Road', 'HB Samaja', 'Anjanapura'], platform: '12', farePerStage: 6 },
+            { id: 'r20', busNumber: '240B', type: 'Ordinary', stops: ['Majestic', 'Magadi Road', 'Annapoorneshwari Nagar'], platform: '4', farePerStage: 5 },
+            { id: 'r21', busNumber: '246', type: 'Ordinary', stops: ['Majestic', 'Magadi Road', 'Annapoorneshwari Nagar'], platform: '4', farePerStage: 5 },
+            { id: 'r22', busNumber: '290P', type: 'Ordinary', stops: ['Majestic', 'Vidhanasoudha', 'Arabic Colg'], platform: '19', farePerStage: 5 },
+            { id: 'r23', busNumber: '360B, 360K', type: 'Ordinary', stops: ['Majestic', 'JC Road', 'Lalbagh Main Gate', 'Dairy Circle', 'Attibele'], platform: '15', farePerStage: 6 },
+            { id: 'r24', busNumber: '402C', type: 'Ordinary', stops: ['Majestic', 'Anand Rao Circle', 'Shivananda', 'Bellary Road', 'Attur'], platform: '23', farePerStage: 6 },
+            { id: 'r25', busNumber: '36A', type: 'Ordinary', stops: ['Majestic', 'NR Road', 'KG Road', 'Avalahalli BDA Park'], platform: '10', farePerStage: 5 },
+            { id: 'r26', busNumber: '245K', type: 'Ordinary', stops: ['Majestic', 'Magadi Road', 'Prasanna', 'Dasarahalli', 'Averahalli'], platform: '4', farePerStage: 5 },
+            { id: 'r27', busNumber: '334C', type: 'Ordinary', stops: ['Majestic', 'KG Road', 'Mayohall', 'Airport Road', 'BNagasandra'], platform: '17', farePerStage: 5 },
+            { id: 'r28', busNumber: '302A', type: 'Ordinary', stops: ['Majestic', 'Vidhanasoudha', 'Babasab Palya'], platform: '19', farePerStage: 5 },
+            { id: 'r29', busNumber: '250C', type: 'Ordinary', stops: ['Majestic', 'Central', 'Malleshwaram', 'YPR', 'Bagalagunte'], platform: '20', farePerStage: 6 },
+            { id: 'r30', busNumber: '323K', type: 'Ordinary', stops: ['Majestic', 'Richmond Road', 'Mayohall', 'Bagur'], platform: '17', farePerStage: 5 },
+            { id: 'r31', busNumber: '210X', type: 'Ordinary', stops: ['Majestic', 'ISRO Layout', 'Bendre Nagar'], platform: '11', farePerStage: 5 },
+            { id: 'r32', busNumber: '315B', type: 'Ordinary', stops: ['Majestic', 'KG Road', 'Richmond Road', 'A Narayanapura'], platform: '48', farePerStage: 5 },
+            { id: 'r33', busNumber: '365', type: 'Ordinary', stops: ['Majestic', 'Arekere', 'Gottigere', 'Bannerghatta National Park'], platform: '15', farePerStage: 7 },
+            { id: 'r34', busNumber: '250H', type: 'Ordinary', stops: ['Majestic', 'Jalahalli Cross', 'Dasarahalli', 'Bonmill'], platform: '20', farePerStage: 6 },
+            { id: 'r35', busNumber: '225G', type: 'Ordinary', stops: ['Majestic', 'Mysore Road', 'Bangarappa Nagar'], platform: '19A', farePerStage: 5 },
+            { id: 'r36', busNumber: '226N', type: 'Ordinary', stops: ['Majestic', 'Kengeri', 'Kumbalagodu', 'Bidadi'], platform: '19A', farePerStage: 6 },
+            { id: 'r37', busNumber: '322A', type: 'Ordinary', stops: ['Majestic', 'MG Road', 'Byalahalli'], platform: '17', farePerStage: 5 },
+            { id: 'r38', busNumber: '296B', type: 'Ordinary', stops: ['Majestic', 'Brundavan Nagar'], platform: '19', farePerStage: 5 },
+            { id: 'r39', busNumber: '25C', type: 'Ordinary', stops: ['Majestic', 'Carmel Convent', 'Balaji Nagar'], platform: '13', farePerStage: 5 },
+            { id: 'r40', busNumber: '300B', type: 'Ordinary', stops: ['Majestic', 'Vidhanasoudha', 'Banasawadi'], platform: '19', farePerStage: 5 },
+            { id: 'r41', busNumber: '12A', type: 'Ordinary', stops: ['Majestic', 'Banashankari 2 Stg'], platform: '11', farePerStage: 5 },
+            { id: 'r42', busNumber: '43E', type: 'Ordinary', stops: ['Majestic', 'Banashankari 3 Stg 2Ph'], platform: '9', farePerStage: 5 },
+            { id: 'r43', busNumber: '12, 12E', type: 'Ordinary', stops: ['Majestic', 'Sangam Circle', 'Banashankari Bus Station'], platform: '11', farePerStage: 5 },
+            { id: 'r44', busNumber: '239C', type: 'Ordinary', stops: ['Majestic', 'Magadi Road', 'Bang Childrens Hospital'], platform: '19A', farePerStage: 5 },
+            { id: 'r45', busNumber: '57A', type: 'Ordinary', stops: ['Majestic', 'Mysore Road', 'Ram Mandir', 'Bapuji Nagar'], platform: '19A', farePerStage: 5 },
+            { id: 'r46', busNumber: '314N', type: 'Ordinary', stops: ['Majestic', 'Mayohall', 'Halasur', 'CMH Road', 'Basava Nagar'], platform: '18', farePerStage: 5 },
+            { id: 'r47', busNumber: '314T', type: 'Ordinary', stops: ['Majestic', 'Mayohall', 'Halasur', 'CMH Road', 'Basava Nagar'], platform: '18', farePerStage: 5 },
+            { id: 'r48', busNumber: '333C', type: 'Ordinary', stops: ['Majestic', 'Mayohall', 'Halasur', 'CMH Road', 'Basava Nagar'], platform: '17', farePerStage: 5 },
+            { id: 'r49', busNumber: '88', type: 'Ordinary', stops: ['Majestic', 'Sujatha', 'Rama mandir', 'Basaveshwara Nagar'], platform: '5', farePerStage: 5 },
+            { id: 'r50', busNumber: '88A', type: 'Ordinary', stops: ['Majestic', 'Sujatha', 'Basaveshwara Nagar'], platform: '5', farePerStage: 5 },
+            { id: 'r51', busNumber: '61C', type: 'Ordinary', stops: ['Majestic', 'Sujatha', 'RNR 6 Blk', 'Vijaya Nagar', 'BCC Layout'], platform: '3', farePerStage: 5 },
+            { id: 'r52', busNumber: '221G', type: 'Ordinary', stops: ['Majestic', 'Beedi Karmikara Badavane'], platform: '19A', farePerStage: 5 },
+            { id: 'r53', busNumber: '215E', type: 'Ordinary', stops: ['Majestic', 'KG Road', 'Lalbagh Road', 'Bireshwara Nagar'], platform: '12', farePerStage: 5 },
+            { id: 'r54', busNumber: '281F', type: 'Ordinary', stops: ['Majestic', 'Anandrao Circle', 'Shivananda', 'Begur'], platform: '23', farePerStage: 5 },
+            { id: 'r55', busNumber: '343E', type: 'Ordinary', stops: ['Majestic', 'Lalbagh Road', 'St. Johns', 'Hosur', 'Begur'], platform: '15', farePerStage: 6 },
+            { id: 'r56', busNumber: '341D', type: 'Ordinary', stops: ['Majestic', 'KG Road', 'Lalbagh Road', 'St. Johns', 'Hosur', 'Bellandur'], platform: '15', farePerStage: 6 },
+            { id: 'r57', busNumber: '329H', type: 'Ordinary', stops: ['Majestic', 'Richmond Road', 'Mayohall', 'Airport Road', 'Bellikere'], platform: '17', farePerStage: 6 },
+            { id: 'r58', busNumber: '225C', type: 'Ordinary', stops: ['Majestic', 'Goods Shed', 'Royan Circle', 'BEML 5Ph'], platform: '19A', farePerStage: 5 },
+            { id: 'r59', busNumber: '225H', type: 'Ordinary', stops: ['Majestic', 'Goods Shed', 'Royan Circle', 'BEML 5Ph'], platform: '19A', farePerStage: 5 },
+            { id: 'r60', busNumber: '380M', type: 'Ordinary', stops: ['Majestic', 'KG Road', 'Richmond Road', 'Bendiganahalli'], platform: '17', farePerStage: 5 },
+            { id: 'r61', busNumber: '241D', type: 'Ordinary', stops: ['Majestic', 'Magadi Road', 'Bharath Nagar 2nd Stg'], platform: '4', farePerStage: 5 },
+            { id: 'r62', busNumber: '96F', type: 'Ordinary', stops: ['Majestic', 'Central', 'Modi Hosp', 'Bhimjyothi Nagar'], platform: '5', farePerStage: 5 },
+            { id: 'r63', busNumber: '279E', type: 'Ordinary', stops: ['Majestic', 'Anandrao Circle', 'Shivananda', 'Bhpopasandra'], platform: '23', farePerStage: 5 },
+            { id: 'r64', busNumber: '45B, 45H', type: 'Ordinary', stops: ['Majestic', 'Hosakerhalli Crs', 'Bhuvaneswari Nagar'], platform: '9', farePerStage: 5 },
+            { id: 'r65', busNumber: '210R', type: 'Ordinary', stops: ['Majestic', 'NR Road', 'HB Samaja', 'Bikasipura'], platform: '12', farePerStage: 5 },
+            { id: 'r66', busNumber: '365D', type: 'Ordinary', stops: ['Majestic', 'Mission Road', 'Dairy Circle', 'Bilavaradahalli'], platform: '15', farePerStage: 5 },
+            { id: 'r67', busNumber: '294', type: 'Ordinary', stops: ['Majestic', 'Vidhanasoudha', 'Cant Rly Station', 'Bilesevale'], platform: '23', farePerStage: 5 },
+            { id: 'r68', busNumber: '294E', type: 'Ordinary', stops: ['Majestic', 'Vidhanasoudha', 'Cant Rly Station', 'Bilesevale'], platform: '19', farePerStage: 5 },
+            { id: 'r69', busNumber: '305P', type: 'Ordinary', stops: ['Majestic', 'Richmond Road', 'Lornmana Bande'], platform: '17', farePerStage: 5 },
+            { id: 'r70', busNumber: '316B, 316K', type: 'Ordinary', stops: ['Majestic', 'Richmond Road', 'Mayohall', 'Boodigere'], platform: '17', farePerStage: 5 },
+            { id: 'r71', busNumber: '49', type: 'Ordinary', stops: ['Majestic', 'Vittal Nagar', 'Ram Mandir', 'Brindavanagagar'], platform: '9', farePerStage: 5 },
+            { id: 'r72', busNumber: '252G', type: 'Ordinary', stops: ['Majestic', 'Central', 'Malleshwaram', 'Tata Inst.', 'Byadarahalli'], platform: '20', farePerStage: 6 },
+            { id: 'r73', busNumber: '26', type: 'Ordinary', stops: ['Majestic', 'Ashoka Pillar', 'Siddapura', 'Byrasandra'], platform: '14', farePerStage: 5 },
+            { id: 'r74', busNumber: '314G', type: 'Ordinary', stops: ['Majestic', 'Richmond Road', 'Mayohall', 'Byrasandra'], platform: '18', farePerStage: 5 },
+            { id: 'r75', busNumber: '347F', type: 'Ordinary', stops: ['Majestic', 'JC Road', 'Lalbagh', 'Dairy Circle', 'Central Jail'], platform: '15', farePerStage: 5 },
+            { id: 'r76', busNumber: '356', type: 'Ordinary', stops: ['Majestic', 'JC Road', 'Lalbagh Main Gate', 'Chandapura'], platform: '15', farePerStage: 6 },
+            { id: 'r77', busNumber: '61A, 61G', type: 'Ordinary', stops: ['Majestic', 'Incometax Layout', 'Chandra Layout'], platform: '3', farePerStage: 5 },
+            { id: 'r78', busNumber: '61J', type: 'Ordinary', stops: ['Majestic', 'Chandra Layout 1 Stg'], platform: '3', farePerStage: 5 },
+            { id: 'r79', busNumber: '210X', type: 'Ordinary', stops: ['Majestic', 'NR Road', 'HB Samaja', 'Chandra Nagar'], platform: '12', farePerStage: 5 },
+            { id: 'r80', busNumber: '305D', type: 'Ordinary', stops: ['Majestic', 'Richmond Road', 'Mayohall', 'Channasandra'], platform: '17', farePerStage: 5 },
+            { id: 'r81', busNumber: '316F', type: 'Ordinary', stops: ['Majestic', 'Richmond Road', 'Mayohall', 'Cheemasadra'], platform: '17', farePerStage: 5 },
+            { id: 'r82', busNumber: '45E, 45F', type: 'Ordinary', stops: ['Majestic', 'Chennannanakare Achukattu'], platform: '9', farePerStage: 5 },
+            { id: 'r83', busNumber: '365K', type: 'Ordinary', stops: ['Majestic', 'Mission Road', 'KH Road', 'Chettekere Palya'], platform: '15', farePerStage: 5 },
+            { id: 'r84', busNumber: '250P', type: 'Ordinary', stops: ['Majestic', 'Central', 'Malleshwaram', 'Chikka Banavara'], platform: '20', farePerStage: 6 },
+            { id: 'r85', busNumber: '284F', type: 'Ordinary', stops: ['Majestic', 'Anandrao Circle', 'Chikka Bommasandra'], platform: '23', farePerStage: 5 },
+            { id: 'r86', busNumber: '369G', type: 'Ordinary', stops: ['Majestic', 'Mission Road', 'Chikkakammanahalli'], platform: '15', farePerStage: 5 },
+            { id: 'r87', busNumber: '210J, 210M', type: 'Ordinary', stops: ['Majestic', 'NR Road', 'HB Samaja', 'Chikkalasandra'], platform: '12', farePerStage: 5 },
+            { id: 'r88', busNumber: '210P', type: 'Ordinary', stops: ['Majestic', 'NR Road', 'HB Samaja', 'Chikkalasandra'], platform: '12', farePerStage: 5 },
+            { id: 'r89', busNumber: '119A', type: 'Ordinary', stops: ['Majestic', 'KG Road', 'Tel Exchg', 'Chinnappa GaRoaden'], platform: '25', farePerStage: 5 },
+            { id: 'r90', busNumber: '124', type: 'Ordinary', stops: ['Majestic', 'CQAL', 'Borebank R', 'Chinnappa GaRoaden'], platform: '19', farePerStage: 5 },
+            { id: 'r91', busNumber: '333D', type: 'Ordinary', stops: ['Majestic', 'Richmond Road', 'Chinnappanahalli'], platform: '17', farePerStage: 5 },
+            { id: 'r92', busNumber: '287E', type: 'Ordinary', stops: ['Majestic', 'Anandrao Circle', 'Chola Nayakanahalli'], platform: '23', farePerStage: 5 },
+            { id: 'r93', busNumber: '99E', type: 'Ordinary', stops: ['Majestic', 'Chowdeshwari/JP Park Bus Station'], platform: '21', farePerStage: 5 },
+            { id: 'r94', busNumber: '267A', type: 'Ordinary', stops: ['Majestic', 'Central', 'Malleshwaram', 'Chowdeshwari Nagar'], platform: '22', farePerStage: 6 },
+            { id: 'r95', busNumber: '99A', type: 'Ordinary', stops: ['Majestic', 'Chowdeshwari Bus Station'], platform: '21', farePerStage: 5 },
+            { id: 'r96', busNumber: '293H', type: 'Ordinary', stops: ['Majestic', 'Cant Rly Station', 'Dasanayakanahalli'], platform: '19', farePerStage: 5 },
+            { id: 'r97', busNumber: '306D', type: 'Ordinary', stops: ['Majestic', 'Richmond Road', 'Mayohall', 'Devanagundi'], platform: '17', farePerStage: 5 },
+            { id: 'r98', busNumber: '298M', type: 'Ordinary', stops: ['Majestic', 'Anandrao Circle', 'Shivananda', 'Devanahalli'], platform: '23', farePerStage: 6 },
+            { id: 'r99', busNumber: '364B', type: 'Ordinary', stops: ['Majestic', 'JC Road', 'Devara Chikkanahalli'], platform: '15', farePerStage: 5 },
+            { id: 'r100', busNumber: '315Q', type: 'Ordinary', stops: ['Majestic', 'Richmond Road', 'Mayohall', 'Devasandra'], platform: '17', farePerStage: 5 },
+            { id: 'r101', busNumber: '365Q', type: 'Ordinary', stops: ['Majestic', 'Mission Road', 'KH Road', 'Dairy Circle', 'Devasandra'], platform: '15', farePerStage: 5 },
+            { id: 'r102', busNumber: '235B, 235K', type: 'Ordinary', stops: ['Majestic', 'ORR', 'Nagarbhavi Circle', 'Dodda Basthi'], platform: '19A', farePerStage: 5 },
+            { id: 'r103', busNumber: '263H', type: 'Ordinary', stops: ['Majestic', 'Central', 'Malleshwaram', 'DoddaBidarakal'], platform: '20', farePerStage: 6 },
+            { id: 'r104', busNumber: '295A', type: 'Ordinary', stops: ['Majestic', 'NR Road', 'KG Road', 'Vidhanasoudha', 'Dodda Gubbi'], platform: '19', farePerStage: 5 },
+            { id: 'r105', busNumber: '333F', type: 'Ordinary', stops: ['Majestic', 'Richmond Road', 'Dodda Nekkundi'], platform: '17', farePerStage: 5 },
+            { id: 'r106', busNumber: '346N', type: 'Ordinary', stops: ['Majestic', 'JC Road', 'Dairy Circle', 'Dodda Toogur'], platform: '15', farePerStage: 5 },
+            { id: 'r107', busNumber: '285M', type: 'Ordinary', stops: ['Majestic', 'Anandrao Circle', 'Doddaballapura'], platform: '23', farePerStage: 6 },
+            { id: 'r108', busNumber: '131F', type: 'Ordinary', stops: ['Majestic', 'Domlur BusStation'], platform: '18', farePerStage: 5 },
+            { id: 'r109', busNumber: '131', type: 'Ordinary', stops: ['Majestic', 'Halasur', 'CMH Road', 'Doopanahalli'], platform: '18', farePerStage: 5 },
+            { id: 'r110', busNumber: '314E', type: 'Ordinary', stops: ['Majestic', 'KG Road', 'DRDO Township'], platform: '18', farePerStage: 5 },
+            { id: 'r111', busNumber: 'KSRTC', type: 'KSRTC', stops: ['Majestic', 'Doddaballapura'], platform: '23', farePerStage: 8 },
+            { id: 'r112', busNumber: 'KSRTC', type: 'KSRTC', stops: ['Majestic', 'Devanahalli'], platform: '23', farePerStage: 8 },
+            { id: 'r113', busNumber: '215D', type: 'Ordinary', stops: ['Majestic', 'KG Road', 'Lalbagh Road', 'Eshwara Layout'], platform: '12', farePerStage: 5 },
+            { id: 'r114', busNumber: '146E, 146B', type: 'Ordinary', stops: ['Majestic', 'Vannarpet', 'Austin Town', 'Philomina', 'Ejipura'], platform: '16', farePerStage: 5 },
+            { id: 'r115', busNumber: '356C', type: 'Ordinary', stops: ['Majestic', 'KG Road', 'Lalbagh Road', 'Electronic City'], platform: '15', farePerStage: 6 },
+            { id: 'r116', busNumber: '2B', type: 'Ordinary', stops: ['Majestic', 'JPN 15 Crs', 'SSMRV', 'Tel Exchg', 'Eliyas Nagar'], platform: '11', farePerStage: 5 },
+            { id: 'r117', busNumber: '80G', type: 'Ordinary', stops: ['Majestic', 'Freedom Fighters Col'], platform: '6', farePerStage: 5 },
+            { id: 'r118', busNumber: '165B', type: 'Ordinary', stops: ['Majestic', 'Hosur Road', 'Gajendra-Nagar'], platform: '14', farePerStage: 5 },
+            { id: 'r119', busNumber: '320B', type: 'Ordinary', stops: ['Majestic', 'KG Road', 'Richmond Road', 'Mayohall', 'Gandhi Pura'], platform: '17', farePerStage: 5 },
+            { id: 'r120', busNumber: '30C', type: 'Ordinary', stops: ['Majestic', 'KG Road', 'Tel Exchg', 'Carmel Colg', 'Ganga Nagar'], platform: '25', farePerStage: 5 },
+            { id: 'r121', busNumber: '108B', type: 'Ordinary', stops: ['Majestic', 'KG Road', 'Tel Exchg', 'Carmel Colg', 'Ganga Nagar'], platform: '25', farePerStage: 5 },
+            { id: 'r122', busNumber: '59D', type: 'Ordinary', stops: ['Majestic', 'Gangondanahalli'], platform: '3', farePerStage: 5 },
+            { id: 'r123', busNumber: '89B', type: 'Ordinary', stops: ['Majestic', 'Gangondanahalli'], platform: '1', farePerStage: 5 },
+            { id: 'r124', busNumber: '87D', type: 'Ordinary', stops: ['Majestic', 'Gangondanahalli'], platform: '1', farePerStage: 5 },
+            { id: 'r125', busNumber: '253G', type: 'Ordinary', stops: ['Majestic', 'Central', 'Malleshwaram', 'Gangondanahalli'], platform: '20', farePerStage: 6 },
+            { id: 'r126', busNumber: '89B', type: 'Ordinary', stops: ['Majestic', 'Nandini Talkies', 'ESI', 'GeleyaraBalaga'], platform: '7', farePerStage: 5 },
+            { id: 'r127', busNumber: '250S', type: 'Ordinary', stops: ['Majestic', 'Central', 'Malleshwaram', 'GeleyaraBalaga'], platform: '20', farePerStage: 6 },
+            { id: 'r128', busNumber: '243F', type: 'Ordinary', stops: ['Majestic', 'Magadi Road', 'Gidadakonahalli'], platform: '4', farePerStage: 5 },
+            { id: 'r129', busNumber: '365N', type: 'Ordinary', stops: ['Majestic', 'Mission Road', 'KH Road', 'Giddenahalli'], platform: '15', farePerStage: 5 },
+            { id: 'r130', busNumber: '36B', type: 'Ordinary', stops: ['Majestic', 'Giri Nagar 2 Stg'], platform: '10', farePerStage: 5 },
+            { id: 'r131', busNumber: '36E', type: 'Ordinary', stops: ['Majestic', 'Muneshwara Blk', 'Giri Nagar Circle'], platform: '10', farePerStage: 5 },
+            { id: 'r132', busNumber: '277', type: 'Ordinary', stops: ['Majestic', 'Anandrao Circle', 'Shivananda', 'Bellary Road', 'GKVK'], platform: '23', farePerStage: 6 },
+            { id: 'r133', busNumber: '61F', type: 'Ordinary', stops: ['Majestic', 'Vijaya Nagar', 'RNR 6 Blk', 'GKW Layout'], platform: '3', farePerStage: 5 },
+            { id: 'r134', busNumber: '80C', type: 'Ordinary', stops: ['Majestic', 'Mahalakshmi Layout', 'Goraguntepalya'], platform: '6', farePerStage: 5 },
+            { id: 'r135', busNumber: '235C', type: 'Ordinary', stops: ['Majestic', 'University', 'Mudalapalya', 'Govt Press'], platform: '19A', farePerStage: 5 },
+            { id: 'r136', busNumber: '327, 327D', type: 'Ordinary', stops: ['Majestic', 'KG Road', 'Richmond Road', 'Mayohall', 'Gunjur'], platform: '17', farePerStage: 5 },
+            { id: 'r137', busNumber: '241J', type: 'Ordinary', stops: ['Majestic', 'Magadi Road', 'Dasarahalli', 'Gollarahatti'], platform: '4', farePerStage: 5 },
+            { id: 'r138', busNumber: '304K', type: 'Ordinary', stops: ['Majestic', 'Tin Factory', 'Garudachar Palya'], platform: '17', farePerStage: 5 },
+            { id: 'r139', busNumber: '226A', type: 'Ordinary', stops: ['Majestic', 'Royan Circle', 'Mysore Road', 'Hampapura'], platform: '19A', farePerStage: 5 },
+            { id: 'r140', busNumber: '351J', type: 'Ordinary', stops: ['Majestic', 'JC Road', 'Lalbagh Road', 'Handenahalli'], platform: '15', farePerStage: 5 },
+            { id: 'r141', busNumber: '360J', type: 'Ordinary', stops: ['Majestic', 'JC Road', 'Lalbagh Road', 'Handenahalli'], platform: '15', farePerStage: 5 },
+            { id: 'r142', busNumber: '365A', type: 'Ordinary', stops: ['Majestic', 'Mission Road', 'KH Road', 'Dairy Circle', 'Haragadde'], platform: '15', farePerStage: 5 },
+            { id: 'r143', busNumber: '341E', type: 'Ordinary', stops: ['Majestic', 'Lalbagh Road', 'Lalbagh Main Gate', 'Haralur'], platform: '15', farePerStage: 5 },
+            { id: 'r144', busNumber: '304H', type: 'Ordinary', stops: ['Majestic', 'Richmond Road', 'Mayohall', 'Harohalli'], platform: '17', farePerStage: 5 },
+            { id: 'r145', busNumber: '349J', type: 'Ordinary', stops: ['Majestic', 'JC Road', 'Lalbagh Main Gate', 'Harohalli'], platform: '17', farePerStage: 5 },
+            { id: 'r146', busNumber: '325A', type: 'Ordinary', stops: ['Majestic', 'Richmond Road', 'Mayohall', 'Harohalli'], platform: '17', farePerStage: 5 },
+            { id: 'r147', busNumber: '415A', type: 'Ordinary', stops: ['Majestic', 'Tel Exchg', 'HBR 2 Stg'], platform: '25', farePerStage: 5 },
+            { id: 'r148', busNumber: '296T, 296B', type: 'Ordinary', stops: ['Majestic', 'KG Road', 'HBR Layout 1 BLk'], platform: '19', farePerStage: 5 },
+            { id: 'r149', busNumber: '356E', type: 'Ordinary', stops: ['Majestic', 'JC Road', 'Lalbagh Road', 'Dairy Circle', 'Heelalige'], platform: '15', farePerStage: 5 },
+            { id: 'r150', busNumber: '352A', type: 'Ordinary', stops: ['Majestic', 'JC Road', 'Lalbagh Road', 'Dairy Circle', 'HenNagara'], platform: '15', farePerStage: 5 },
+            { id: 'r151', busNumber: '253J', type: 'Ordinary', stops: ['Majestic', 'Central', 'Malleshwaram', 'Tata Inst', 'Hesaraghatta'], platform: '20', farePerStage: 6 },
+            { id: 'r152', busNumber: '248J', type: 'Ordinary', stops: ['Majestic', 'Hesaraghatta Vinayaka Nagar'], platform: '20', farePerStage: 6 },
+            { id: 'r153', busNumber: '296J', type: 'Ordinary', stops: ['Majestic', 'Indian Express', 'HBR 1 Stg'], platform: '19', farePerStage: 5 },
+            { id: 'r154', busNumber: '369G', type: 'Ordinary', stops: ['Majestic', 'Hammadevanahalli'], platform: '15', farePerStage: 5 },
+            { id: 'r155', busNumber: '355C', type: 'Ordinary', stops: ['Majestic', 'Nimhans', 'Madivala', 'Hebbagodi'], platform: '15', farePerStage: 5 },
+            { id: 'r156', busNumber: '304B', type: 'Ordinary', stops: ['Majestic', 'Richmond Road', 'Mayohall', 'Halasur', 'MG Road', 'Hoodi'], platform: '17', farePerStage: 6 },
+            { id: 'r157', busNumber: '305F', type: 'Ordinary', stops: ['Majestic', 'Richmond Road', 'Mayohall', 'Halasur', 'MG Road', 'Hoodi'], platform: '17', farePerStage: 6 },
+            { id: 'r158', busNumber: '303D', type: 'Ordinary', stops: ['Majestic', 'NR Road', 'KG Road', 'Horamavu Road'], platform: '19', farePerStage: 5 },
+            { id: 'r159', busNumber: '43, 43C, 43E', type: 'Ordinary', stops: ['Majestic', 'Sita Circle', 'Hanumanth Nagar', 'Hosakerehalli'], platform: '9', farePerStage: 5 },
+            { id: 'r160', busNumber: '43B', type: 'Ordinary', stops: ['Majestic', 'Hosakerehalli Crs', 'Sita Circle', 'Hosakerehalli'], platform: '9', farePerStage: 5 },
+            { id: 'r161', busNumber: '317A', type: 'Ordinary', stops: ['Majestic', 'Richmond Road', 'Mayohall', 'Hosakote'], platform: '9', farePerStage: 5 },
+            { id: 'r162', busNumber: '348G', type: 'Ordinary', stops: ['Majestic', 'JC Road', 'Lalbagh Road', 'Hosapalya'], platform: '15', farePerStage: 5 },
+            { id: 'r163', busNumber: '315Y', type: 'Ordinary', stops: ['Majestic', 'KG Road', 'Richmond Road', 'Hoysala Nagar'], platform: '17', farePerStage: 5 },
+            { id: 'r164', busNumber: '340A', type: 'Ordinary', stops: ['Majestic', 'KG Road', 'Lalbagh Road', 'HSR 2 Sec'], platform: '15', farePerStage: 5 },
+            { id: 'r165', busNumber: '348J', type: 'Ordinary', stops: ['Majestic', 'KG Road', 'HSR BDA Complex'], platform: '15', farePerStage: 5 },
+            { id: 'r166', busNumber: '345A', type: 'Ordinary', stops: ['Majestic', 'JC Road', 'Lalbagh Road', 'Hulimangala'], platform: '15', farePerStage: 5 },
+            { id: 'r167', busNumber: '369C', type: 'Ordinary', stops: ['Majestic', 'Mission Road', 'KH Road', 'Hulimavu'], platform: '15', farePerStage: 5 },
+            { id: 'r168', busNumber: '343A', type: 'Ordinary', stops: ['Majestic', 'JC Road', 'Lalbagh Road', 'Hullahalli'], platform: '15', farePerStage: 5 },
+            { id: 'r169', busNumber: '221F', type: 'Ordinary', stops: ['Majestic', 'NR Road', 'Hunasemarada Palya'], platform: '19A', farePerStage: 5 },
+            { id: 'r170', busNumber: '255D', type: 'Ordinary', stops: ['Majestic', 'Central', 'Malleshwaram', 'Tata Inst.', 'Huskur'], platform: '2C', farePerStage: 6 },
+            { id: 'r171', busNumber: '349C', type: 'Ordinary', stops: ['Majestic', 'JC Road', 'Lalbagh Road', 'Dairy Circle', 'Huskur'], platform: '15', farePerStage: 5 },
+            { id: 'r172', busNumber: '250H', type: 'Ordinary', stops: ['Majestic', 'Central', 'IAF Chinmai Hills'], platform: '20', farePerStage: 6 },
+            { id: 'r173', busNumber: '136', type: 'Ordinary', stops: ['Majestic', 'KG Road', 'Indira Nagar ESI'], platform: '18', farePerStage: 5 },
+            { id: 'r174', busNumber: '78A', type: 'Ordinary', stops: ['Majestic', 'Ram Mandir', 'ESI', 'ISKON'], platform: '6', farePerStage: 5 },
+            { id: 'r175', busNumber: '210A', type: 'Ordinary', stops: ['Majestic', 'NR Road', 'HB Samaja', 'ISRO Layout'], platform: '12', farePerStage: 5 },
+            { id: 'r176', busNumber: '275C', type: 'Ordinary', stops: ['Majestic', 'Central', 'Malleshwaram', 'ISRO Quarters'], platform: '22', farePerStage: 6 },
+            { id: 'r177', busNumber: '300C', type: 'Ordinary', stops: ['Majestic', 'Vidhanasoudha', 'ITI Colony'], platform: '19', farePerStage: 5 },
+            { id: 'r178', busNumber: '304A', type: 'Ordinary', stops: ['Majestic', 'MG Road', 'Tin Factory', 'ITPL'], platform: '17', farePerStage: 6 },
+            { id: 'r179', busNumber: '244F', type: 'Ordinary', stops: ['Majestic', 'Magadi Road', 'Kamakshipalya', 'ITI Layout'], platform: '4', farePerStage: 5 },
+            { id: 'r180', busNumber: '45D', type: 'Ordinary', stops: ['Majestic', 'AGS Layout', 'Ittamadu'], platform: '9', farePerStage: 5 },
+            { id: 'r181', busNumber: '333A', type: 'Ordinary', stops: ['Majestic', 'Richmond Road', 'HAL', 'Jagadeesh Nagar'], platform: '17', farePerStage: 5 },
+            { id: 'r182', busNumber: '56', type: 'Ordinary', stops: ['Majestic', 'JJ Nagar', 'Jagajeevanram Nagar'], platform: '19A', farePerStage: 5 },
+            { id: 'r183', busNumber: '317L', type: 'Ordinary', stops: ['Majestic', 'KG Road', 'Richmond Road', 'Mayohall', 'Jangamakote'], platform: '17', farePerStage: 5 },
+            { id: 'r184', busNumber: '80F', type: 'Ordinary', stops: ['Majestic', 'RK Nagar', 'Jai Bhuvaneswari Nagar'], platform: '6', farePerStage: 5 },
+            { id: 'r185', busNumber: '80B, 80D', type: 'Ordinary', stops: ['Majestic', 'Jai Maruthi Nagar'], platform: '6', farePerStage: 5 },
+            { id: 'r186', busNumber: '168E', type: 'Ordinary', stops: ['Majestic', 'Tavarekere', 'Dairy Circle', 'Jaibheema Nagar'], platform: '14', farePerStage: 5 },
+            { id: 'r187', busNumber: '271D', type: 'Ordinary', stops: ['Majestic', 'Central', 'Malleshwaram', 'Tata Inst.', 'Jalahalli'], platform: '22', farePerStage: 6 },
+            { id: 'r188', busNumber: '273C, 273F', type: 'Ordinary', stops: ['Majestic', 'Central', 'Malleshwaram', 'Jalahalli Crs'], platform: '22', farePerStage: 6 },
+            { id: 'r189', busNumber: '271', type: 'Ordinary', stops: ['Majestic', 'Jalahalli East'], platform: '22', farePerStage: 6 },
+            { id: 'r190', busNumber: '215H', type: 'Ordinary', stops: ['Majestic', 'Lalbagh', 'Jambusavari Dinne'], platform: '12', farePerStage: 6 },
+            { id: 'r191', busNumber: '245G', type: 'Ordinary', stops: ['Majestic', 'Magadi Road', 'Janapriya Town Ship'], platform: '4', farePerStage: 5 },
+            { id: 'r192', busNumber: '18', type: 'Ordinary', stops: ['Majestic', 'JNR 3 Blk', 'Jaya Nagar 9 Blk'], platform: '13', farePerStage: 5 },
+            { id: 'r193', busNumber: '22', type: 'Ordinary', stops: ['Majestic', 'Byrasandra', 'Jaya Nagar LIC Col'], platform: '13', farePerStage: 5 },
+            { id: 'r194', busNumber: '303A', type: 'Ordinary', stops: ['Majestic', 'Vidhanasoudha', 'GPO', 'Jayanthi Nagar'], platform: '19', farePerStage: 5 },
+            { id: 'r195', busNumber: '126', type: 'Ordinary', stops: ['Majestic', 'Coles Park', 'Jeevanahalli'], platform: '19', farePerStage: 5 },
+            { id: 'r196', busNumber: '138, 138D', type: 'Ordinary', stops: ['Majestic', 'Halasur', 'MG Road', 'Jeevanbhima Nagar'], platform: '18', farePerStage: 5 },
+            { id: 'r197', busNumber: '15H', type: 'Ordinary', stops: ['Majestic', 'JHBCS Crs', 'JHBCS Layout'], platform: '12', farePerStage: 5 },
+            { id: 'r198', busNumber: '359A', type: 'Ordinary', stops: ['Majestic', 'JC Road', 'Lalbagh Road', 'Lalbagh Main Gate', 'Jigala'], platform: '15', farePerStage: 5 },
+            { id: 'r199', busNumber: '365J', type: 'Ordinary', stops: ['Majestic', 'Mission Road', 'KH Road', 'Wilson Garden', 'Dairy Circle', 'Jigani'], platform: '15', farePerStage: 6 },
+            { id: 'r200', busNumber: '235', type: 'Ordinary', stops: ['Majestic', 'University', 'Mudalapalya', 'Jnanabharathi'], platform: '19A', farePerStage: 5 },
+            { id: 'r201', busNumber: '258W', type: 'Ordinary', stops: ['Majestic', 'Central', 'Jodi Thimmasandra'], platform: '20', farePerStage: 6 },
+            { id: 'r202', busNumber: '2A', type: 'Ordinary', stops: ['Majestic', 'Tel Exchg', 'Oxford School', 'JP Nagar 1 Ph'], platform: '11', farePerStage: 5 },
+            { id: 'r203', busNumber: '25E', type: 'Ordinary', stops: ['Majestic', 'JPN 15 Crs', 'Water Tank', 'JP Nagar 3 Ph'], platform: '13', farePerStage: 5 },
+            { id: 'r204', busNumber: '215M', type: 'Ordinary', stops: ['Majestic', 'KG Road', 'Lalbagh Road', 'JP Nagar 5 Ph'], platform: '12', farePerStage: 5 },
+            { id: 'r205', busNumber: '2, 2E', type: 'Ordinary', stops: ['Majestic', 'JPN 15 Crs', 'SSMRV', 'JP Nagar 6 Ph'], platform: '11', farePerStage: 5 },
+            { id: 'r206', busNumber: '284C', type: 'Ordinary', stops: ['Majestic', 'Anandrao Circle', 'Shivananda', 'Judical Layout'], platform: '23', farePerStage: 6 },
+            { id: 'r207', busNumber: '294B', type: 'Ordinary', stops: ['Majestic', 'Vidhanasoudha', 'Cant Rly Station', 'Jyothi Nagar'], platform: '19', farePerStage: 5 },
+            { id: 'r208', busNumber: '292C', type: 'Ordinary', stops: ['Majestic', 'Vidhanasoudha', 'K Narayanapura'], platform: '19', farePerStage: 5 },
+            { id: 'r209', busNumber: '296N', type: 'Ordinary', stops: ['Majestic', 'Vidhanasoudha', 'Kaduagrahara'], platform: '19', farePerStage: 5 },
+            { id: 'r210', busNumber: '12D', type: 'Ordinary', stops: ['Majestic', 'Kadirenahalli Crs', 'Kadirenahalli Park'], platform: '11', farePerStage: 5 },
+            { id: 'r211', busNumber: '315V', type: 'Ordinary', stops: ['Majestic', 'Richmond Road', 'Mayohall', 'Kadugodi'], platform: '17', farePerStage: 6 },
+            { id: 'r212', busNumber: '319C', type: 'Ordinary', stops: ['Majestic', 'Richmond Road', 'Mayohall', 'Kadugodi'], platform: '17', farePerStage: 6 },
+            { id: 'r213', busNumber: '333E', type: 'Ordinary', stops: ['Majestic', 'Richmond Road', 'Mayohall', 'Kadugodi'], platform: '17', farePerStage: 6 },
+            { id: 'r214', busNumber: '335E', type: 'Ordinary', stops: ['Majestic', 'Richmond Road', 'Mayohall', 'Kadugodi'], platform: '17', farePerStage: 6 },
+            { id: 'r215', busNumber: '211F', type: 'Ordinary', stops: ['Majestic', 'NR Road', 'HB Samaja', 'Kaggalipura'], platform: '12', farePerStage: 6 },
+            { id: 'r216', busNumber: '371D', type: 'Ordinary', stops: ['Majestic', 'Mission Road', 'KH Road', 'Kaggalipura'], platform: '15', farePerStage: 5 },
+            { id: 'r217', busNumber: '380', type: 'Ordinary', stops: ['Majestic', 'NR Road', 'Richmond Road', 'Mayohall', 'Kolathur'], platform: '17', farePerStage: 5 },
+            { id: 'r218', busNumber: '36F', type: 'Ordinary', stops: ['Majestic', 'Muneshwara Blk', 'Kalidas Layout'], platform: '10', farePerStage: 5 },
+            { id: 'r219', busNumber: '315D', type: 'Ordinary', stops: ['Majestic', 'Richmond Road', 'Mayohall', 'Halasur', 'Kalkere'], platform: '17', farePerStage: 5 },
+            { id: 'r220', busNumber: '296C', type: 'Ordinary', stops: ['Majestic', 'Vidhanasoudha', 'Kalyana Nagar'], platform: '19', farePerStage: 5 },
+            { id: 'r221', busNumber: '302F, 302N', type: 'Ordinary', stops: ['Majestic', 'Vidhanasoudha', 'Cant Rly Station', 'Kalyana Nagar'], platform: '19', farePerStage: 5 },
+            { id: 'r222', busNumber: '284J', type: 'Ordinary', stops: ['Majestic', 'Anandrao Circle', 'Shivananda', 'Kamakshi Layout'], platform: '2', farePerStage: 6 },
+            { id: 'r223', busNumber: '242A', type: 'Ordinary', stops: ['Majestic', 'Magadi Road', 'Kamakshipalya'], platform: '4', farePerStage: 5 },
+            { id: 'r224', busNumber: '96C', type: 'Ordinary', stops: ['Majestic', 'Sujatha', 'Rama Mandir', 'Kamala Nagar'], platform: '5', farePerStage: 5 },
+            { id: 'r225', busNumber: '96D', type: 'Ordinary', stops: ['Majestic', 'Central', 'Devaiah Park', 'Modi Hosp', 'Kamala Nagar'], platform: '5', farePerStage: 5 },
+            { id: 'r226', busNumber: '96E, 96B', type: 'Ordinary', stops: ['Majestic', 'BEML Layout', 'Kamalanagar'], platform: '5', farePerStage: 5 },
+            { id: 'r227', busNumber: '381E', type: 'Ordinary', stops: ['Majestic', 'Richmond Road', 'Mayohall', 'Kambali Pura'], platform: '17', farePerStage: 5 },
+            { id: 'r228', busNumber: '218A', type: 'Ordinary', stops: ['Majestic', 'Goods Shed Road', 'Royan Circle', 'Kambipura'], platform: '19A', farePerStage: 5 },
+            { id: 'r229', busNumber: '302B', type: 'Ordinary', stops: ['Majestic', 'Vidhanasoudha', 'Kammanahalli'], platform: '19', farePerStage: 5 },
+            { id: 'r230', busNumber: '381B', type: 'Ordinary', stops: ['Majestic', 'Richmond Road', 'Mayohall', 'Kammasandra'], platform: '17', farePerStage: 5 },
+            { id: 'r231', busNumber: '253G', type: 'Ordinary', stops: ['Majestic', 'NR Road', 'KG Road', 'Central', 'Tata Inst', 'Kanasawadi'], platform: '20', farePerStage: 6 },
+            { id: 'r232', busNumber: '258T', type: 'Ordinary', stops: ['Majestic', 'Central', 'Malleshwaram', 'Kannamangala'], platform: '20', farePerStage: 6 },
+            { id: 'r233', busNumber: '317P', type: 'Ordinary', stops: ['Majestic', 'MG Road', 'Hoskote', 'Kannamangala'], platform: '17', farePerStage: 6 },
+            { id: 'r234', busNumber: '210W', type: 'Ordinary', stops: ['Majestic', 'NR Road', 'RK Ashram', 'Karishma Hills'], platform: '12', farePerStage: 5 },
+            { id: 'r235', busNumber: '316J', type: 'Ordinary', stops: ['Majestic', 'KG Road', 'Richmond Road', 'Kattu Gollahalli'], platform: '17', farePerStage: 5 },
+            { id: 'r236', busNumber: '111D', type: 'Ordinary', stops: ['Majestic', 'Ambedkar Colg', 'Kaval Byrasandra'], platform: '25', farePerStage: 5 },
+            { id: 'r237', busNumber: '89A', type: 'Ordinary', stops: ['Majestic', 'Kurubarahalli', 'Modi Hosp', 'Kaveri Nagar'], platform: '7', farePerStage: 5 },
+            { id: 'r238', busNumber: '336B', type: 'Ordinary', stops: ['Majestic', 'KG Road', 'Richmond Road', 'Mayohall', 'Kempapura'], platform: '17', farePerStage: 5 },
+            { id: 'r239', busNumber: '71', type: 'Ordinary', stops: ['Majestic', 'Central'], platform: '6', farePerStage: 5 },
+            { id: 'r240', busNumber: '82', type: 'Ordinary', stops: ['Majestic', 'Central'], platform: '21', farePerStage: 5 },
+            { id: 'r241', busNumber: '82A', type: 'Ordinary', stops: ['Majestic', 'Central'], platform: '21', farePerStage: 5 },
+            { id: 'r242', busNumber: '96', type: 'Ordinary', stops: ['Majestic', 'Central'], platform: '5', farePerStage: 5 },
+            { id: 'r243', busNumber: '98', type: 'Ordinary', stops: ['Majestic', 'Sujatha'], platform: '5', farePerStage: 5 },
+            { id: 'r244', busNumber: '162', type: 'Ordinary', stops: ['Majestic', 'KG Road'], platform: '14', farePerStage: 5 },
+            { id: 'r245', busNumber: '162A', type: 'Ordinary', stops: ['Majestic', 'KG Road'], platform: '13', farePerStage: 5 },
+            { id: 'r246', busNumber: '162B', type: 'Ordinary', stops: ['Majestic', 'KG Road'], platform: '14', farePerStage: 5 },
+            { id: 'r247', busNumber: '162C', type: 'Ordinary', stops: ['Majestic', 'KG Road'], platform: '14', farePerStage: 5 },
+            { id: 'r248', busNumber: '238H', type: 'Ordinary', stops: ['Majestic', 'Sujatha'], platform: '4', farePerStage: 5 },
+            { id: 'r249', busNumber: '264', type: 'Ordinary', stops: ['Majestic', 'Central'], platform: '7', farePerStage: 5 },
+            { id: 'r250', busNumber: '264A', type: 'Ordinary', stops: ['Majestic', 'Central'], platform: '22', farePerStage: 6 },
+            { id: 'r251', busNumber: '265', type: 'Ordinary', stops: ['Majestic', 'Central'], platform: '4', farePerStage: 5 },
+            { id: 'r252', busNumber: '265A', type: 'Ordinary', stops: ['Majestic', 'Magadi Road'], platform: '20', farePerStage: 6 },
+            { id: 'r253', busNumber: '275A', type: 'Ordinary', stops: ['Majestic', 'Central'], platform: '22', farePerStage: 6 },
+            { id: 'r254', busNumber: '275B', type: 'Ordinary', stops: ['Majestic', 'Magadi Road'], platform: '22', farePerStage: 6 },
+            { id: 'r255', busNumber: '405', type: 'Ordinary', stops: ['Majestic', 'Goods Shed'], platform: '19A', farePerStage: 5 },
+            { id: 'r256', busNumber: '405A', type: 'Ordinary', stops: ['Majestic', 'Magadi Road'], platform: '4', farePerStage: 5 },
+            { id: 'r257', busNumber: '35', type: 'Ordinary', stops: ['Majestic', 'Swimmingpool', 'Kempegowda Nagar'], platform: '20', farePerStage: 6 },
+            { id: 'r258', busNumber: '241B', type: 'Ordinary', stops: ['Majestic', 'Magadi Road', 'Kenchanapura'], platform: '4', farePerStage: 5 },
+            { id: 'r259', busNumber: '364g', type: 'Ordinary', stops: ['Majestic', 'JC Road', 'Lalbagh Road', 'Kenchenahalli'], platform: '15', farePerStage: 5 },
+            { id: 'r260', busNumber: '171C', type: 'Ordinary', stops: ['Majestic', 'BDA Comp', 'Mission Road', 'Kendrya Sadana'], platform: '19A', farePerStage: 5 },
+            { id: 'r261', busNumber: '222F', type: 'Ordinary', stops: ['Majestic', 'Goods Shed', 'Kengeri KHB Qtrs.'], platform: '19A', farePerStage: 5 },
+            { id: 'r262', busNumber: '222A', type: 'Ordinary', stops: ['Majestic', 'Royan Circle', 'Kengeri Satellite Town'], platform: '19A', farePerStage: 6 },
+            { id: 'r263', busNumber: '317Z', type: 'Ordinary', stops: ['Majestic', 'Richmond Road', 'Mayohall', 'Khaji Hosahalli'], platform: '15', farePerStage: 5 },
+            { id: 'r264', busNumber: '86', type: 'Ordinary', stops: ['Majestic', 'Magadi Road', 'RNR 6 Blk', 'KHB Colony'], platform: '14', farePerStage: 5 },
+            { id: 'r265', busNumber: '403A', type: 'Ordinary', stops: ['Majestic', 'Sujatha', 'RNR 6 Blk', 'KHBQuarters'], platform: '19A', farePerStage: 5 },
+            { id: 'r266', busNumber: '315T', type: 'Ordinary', stops: ['Majestic', 'Richmond Road', 'Mayohall', 'Kittaganur'], platform: '17', farePerStage: 5 },
+            { id: 'r267', busNumber: '245J', type: 'Ordinary', stops: ['Majestic', 'Magadi Road', 'Kittanahalli'], platform: '4', farePerStage: 5 },
+            { id: 'r268', busNumber: '288D', type: 'Ordinary', stops: ['Majestic', 'Anandrao Circle', 'Shivananda', 'Kodigehalli'], platform: '23', farePerStage: 6 },
+            { id: 'r269', busNumber: '288G', type: 'Ordinary', stops: ['Majestic', 'Shivananda', 'Bellary Road', 'Kodihalli'], platform: '23', farePerStage: 6 },
+            { id: 'r270', busNumber: '215K', type: 'Ordinary', stops: ['Majestic', 'NR Road', 'HB Samaja', 'Konanakunte'], platform: '12', farePerStage: 5 },
+            { id: 'r271', busNumber: '365C', type: 'Ordinary', stops: ['Majestic', 'Mission Road', 'KH Road', 'Wilson Garden', 'Koppa'], platform: '15', farePerStage: 5 },
+            { id: 'r272', busNumber: '305D', type: 'Ordinary', stops: ['Majestic', 'Koraluru'], platform: '17', farePerStage: 5 },
+            { id: 'r273', busNumber: '333B', type: 'Ordinary', stops: ['Majestic', 'Manipal', 'Murugeshpalya', 'Kundalahalli'], platform: '17', farePerStage: 5 },
+            { id: 'r274', busNumber: '323J', type: 'Ordinary', stops: ['Majestic', 'Kuthaganahalli'], platform: '17', farePerStage: 5 },
+            { id: 'r275', busNumber: '336B', type: 'Ordinary', stops: ['Majestic', 'Kempapura'], platform: '17', farePerStage: 5 },
+            { id: 'r276', busNumber: '3C6K', type: 'Ordinary', stops: ['Majestic', 'MG Road', 'Residency Road', 'KD Hosahalli'], platform: '13', farePerStage: 5 },
+            { id: 'r277', busNumber: '171, 171G', type: 'Ordinary', stops: ['Majestic', 'Koramangala BDA Comp', 'Koramangala'], platform: '14', farePerStage: 5 },
+            { id: 'r278', busNumber: '171B', type: 'Ordinary', stops: ['Majestic', 'Koramangala 8th Blk'], platform: '1', farePerStage: 5 },
+            { id: 'r279', busNumber: '146A', type: 'Ordinary', stops: ['Majestic', 'Koramangala Housing Cplx'], platform: '16', farePerStage: 5 },
+            { id: 'r280', busNumber: '171H, 171F', type: 'Ordinary', stops: ['Majestic', 'Koramangala Housing Cplx'], platform: '14', farePerStage: 5 },
+            { id: 'r281', busNumber: '215J, 215R', type: 'Ordinary', stops: ['Majestic', 'NR Road', 'HB Samaja', 'Kothanoor'], platform: '12', farePerStage: 5 },
+            { id: 'r282', busNumber: '310', type: 'Ordinary', stops: ['Majestic', 'KG Road', 'Richmond Road', 'Mayohall', 'KR Puram'], platform: '17', farePerStage: 5 },
+            { id: 'r283', busNumber: '315', type: 'Ordinary', stops: ['Majestic', 'Richmond Road', 'Mayohall', 'KR Puram'], platform: '17', farePerStage: 5 },
+            { id: 'r284', busNumber: '315K', type: 'Ordinary', stops: ['Majestic', 'KG Road', 'Richmond Road', 'Mayohall', 'KR Puram'], platform: '17', farePerStage: 5 },
+            { id: 'r285', busNumber: '215L', type: 'Ordinary', stops: ['Majestic', 'NR Road', 'HB Samaja', 'Krishna Layout'], platform: '12', farePerStage: 5 },
+            { id: 'r286', busNumber: '315C', type: 'Ordinary', stops: ['Majestic', 'KG Road', 'Richmond Road', 'Krishnaiahana Palya'], platform: '17', farePerStage: 5 },
+            { id: 'r287', busNumber: '347B', type: 'Ordinary', stops: ['Majestic', 'JC Road', 'Lalbagh Road', 'Hosur Road', 'Kudlu'], platform: '15', farePerStage: 5 },
+            { id: 'r288', busNumber: '210U', type: 'Ordinary', stops: ['Majestic', 'NR Road', 'Kumaraswamya Layout'], platform: '12', farePerStage: 5 },
+            { id: 'r289', busNumber: '15C', type: 'Ordinary', stops: ['Majestic', 'KG Road', 'Lalbagh', 'Kumaraswamya Layout'], platform: '12', farePerStage: 5 },
+            { id: 'r290', busNumber: '15E', type: 'Ordinary', stops: ['Majestic', 'KG Road', 'Kumaraswamya Layout'], platform: '12', farePerStage: 5 },
+            { id: 'r291', busNumber: '15G', type: 'Ordinary', stops: ['Majestic', 'Kumaraswamya Layout 2nd Stg'], platform: '12', farePerStage: 5 },
+            { id: 'r292', busNumber: '335E', type: 'Ordinary', stops: ['Majestic', 'KR Road', 'Richmond Road', 'Mayohall', 'Kundalahalli'], platform: '17', farePerStage: 6 },
+            { id: 'r293', busNumber: '89, 89E', type: 'Ordinary', stops: ['Majestic', 'GD Naidu Hall', 'RNR 1 Blk', 'ESI', 'Kubarahalli'], platform: '7', farePerStage: 5 },
+            { id: 'r294', busNumber: '89E', type: 'Ordinary', stops: ['Majestic', 'JC Nagar', 'GD Naidu Hall', 'Kubarahalli'], platform: '7', farePerStage: 5 },
+            { id: 'r295', busNumber: '271B', type: 'Ordinary', stops: ['Majestic', 'Central', 'Kuvempu Nagar 2 Ph'], platform: '22', farePerStage: 6 },
+            { id: 'r296', busNumber: '25A, 25D', type: 'Ordinary', stops: ['Majestic', 'Jayadeva', 'JC Road', 'Kuvempu Nagar (BTM Layout)'], platform: '13', farePerStage: 5 },
+            { id: 'r297', busNumber: '25F', type: 'Ordinary', stops: ['Majestic', 'Jayadeva', 'Kuvempu Nagar (BTM Layout)'], platform: '13', farePerStage: 5 },
+            { id: 'r298', busNumber: '25B', type: 'Ordinary', stops: ['Majestic', 'Jayadeva', 'Kuvempu Nagar (BTM Layout)'], platform: '13', farePerStage: 5 },
+            { id: 'r299', busNumber: '252E', type: 'Ordinary', stops: ['Majestic', 'Malleshwaram', 'Tata Inst', 'Tumkur Road', 'Laggere'], platform: '20', farePerStage: 6 },
+            { id: 'r300', busNumber: '98E', type: 'Ordinary', stops: ['Majestic', 'Sanjaygandhi Nagar', 'Lakshmidevi Nagar'], platform: '21', farePerStage: 5 },
+            { id: 'r301', busNumber: '81', type: 'Ordinary', stops: ['Majestic', 'Prakash Nagar', 'Lakshminarayanapura'], platform: '21', farePerStage: 5 },
+            { id: 'r302', busNumber: '335F', type: 'Ordinary', stops: ['Majestic', 'Richmond Road', 'LB Shasthri Nagar'], platform: '17', farePerStage: 5 },
+            { id: 'r303', busNumber: '129C', type: 'Ordinary', stops: ['Majestic', 'Vidhanasoudha', 'Legislators Home'], platform: '19', farePerStage: 5 },
+            { id: 'r304', busNumber: '302K', type: 'Ordinary', stops: ['Majestic', 'Vidhanasoudha', 'Cant Rly St', 'Lingarajapura'], platform: '19', farePerStage: 5 },
+            { id: 'r305', busNumber: '276C', type: 'Ordinary', stops: ['Majestic', 'Central', 'Malleshwaram', 'Lottegollahali'], platform: '22', farePerStage: 6 },
+            { id: 'r306', busNumber: '98G', type: 'Ordinary', stops: ['Majestic', 'Central', 'Lottegollahali'], platform: '22', farePerStage: 6 },
+            { id: 'r307', busNumber: '415A', type: 'Ordinary', stops: ['Majestic', 'LR Bande'], platform: '24', farePerStage: 5 },
+            { id: 'r308', busNumber: '226P', type: 'Ordinary', stops: ['Majestic', 'Goods Shed', 'Mysore Road', 'M Karena halli'], platform: '19A', farePerStage: 5 },
+            { id: 'r309', busNumber: '357A', type: 'Ordinary', stops: ['Majestic', 'JC Road', 'Hosur Road', 'M Madivala'], platform: '15', farePerStage: 5 },
+            { id: 'r310', busNumber: '252C', type: 'Ordinary', stops: ['Majestic', 'Central', 'Malleshwaram', 'Tata Inst', 'Machohalli'], platform: '20', farePerStage: 6 },
+            { id: 'r311', busNumber: '80', type: 'Ordinary', stops: ['Majestic', 'ESI', 'Balaji Temple', 'Mahalakshmi Layout'], platform: '6', farePerStage: 5 },
+            { id: 'r312', busNumber: '244K', type: 'Ordinary', stops: ['Majestic', 'Sujatha', 'RNR 6 Blk', 'Magadi Road', 'Malgala'], platform: '4', farePerStage: 5 },
+            { id: 'r313', busNumber: '316G', type: 'Ordinary', stops: ['Majestic', 'MG Road', 'Richmond Road', 'Mayohall', 'Mandoor'], platform: '17', farePerStage: 5 },
+            { id: 'r314', busNumber: '348A', type: 'Ordinary', stops: ['Majestic', 'KG Road', 'Lalbagh', 'Mangammana Palya'], platform: '15', farePerStage: 5 },
+            { id: 'r315', busNumber: '257C', type: 'Ordinary', stops: ['Majestic', 'Central', 'Malleshwaram', 'Manjunatha Nagar'], platform: '20', farePerStage: 6 },
+            { id: 'r316', busNumber: '266H', type: 'Ordinary', stops: ['Majestic', 'Central', 'Malleshwaram', 'Mararandra'], platform: '22', farePerStage: 6 },
+            { id: 'r317', busNumber: '354C', type: 'Ordinary', stops: ['Majestic', 'KR Road', 'JC Road', 'Lalbagh', 'Marasoor'], platform: '15', farePerStage: 5 },
+            { id: 'r318', busNumber: '333', type: 'Ordinary', stops: ['Majestic', 'KG Road', 'Richmond Road', 'Mayohall', 'Marathahalli'], platform: '17', farePerStage: 6 },
+            { id: 'r319', busNumber: '333R', type: 'Ordinary', stops: ['Majestic', 'Richmond Road', 'Mayohall', 'Marathahalli Bridge'], platform: '17', farePerStage: 6 },
+            { id: 'r320', busNumber: '61H', type: 'Ordinary', stops: ['Majestic', 'Vijaya Nagar', 'Magadi Road', 'Marenahalli'], platform: '3', farePerStage: 5 },
+            { id: 'r321', busNumber: '365B', type: 'Ordinary', stops: ['Majestic', 'Malenallasandra'], platform: '15', farePerStage: 5 },
+            { id: 'r322', busNumber: '57B', type: 'Ordinary', stops: ['Majestic', 'Mysore Road Bus Station'], platform: '19A', farePerStage: 5 },
+            { id: 'r323', busNumber: '273B', type: 'Ordinary', stops: ['Majestic', 'Central', 'Malleshwaram', 'Tata Inst', 'Medarahalli'], platform: '22', farePerStage: 6 },
+            { id: 'r324', busNumber: '15L', type: 'Ordinary', stops: ['Majestic', 'JHBCS Crs', 'Kadirenahalli Crs', 'Meenaz Nagar'], platform: '12', farePerStage: 5 },
+            { id: 'r325', busNumber: '273B', type: 'Ordinary', stops: ['Majestic', 'Central', 'Malleshwaram', 'Tata Inst', 'Medarahalli'], platform: '22', farePerStage: 6 },
+            { id: 'r326', busNumber: '280K', type: 'Ordinary', stops: ['Majestic', 'Anandrao Circle', 'Shivananda', 'Meetaganahalli'], platform: '23', farePerStage: 6 },
+            { id: 'r327', busNumber: '250M', type: 'Ordinary', stops: ['Majestic', 'Central', 'Malleshwaram', 'Tata Inst', 'MEI Layout'], platform: '20', farePerStage: 6 },
+            { id: 'r328', busNumber: '290J', type: 'Ordinary', stops: ['Majestic', 'Vidhanasoudha', 'Mestri Palya'], platform: '19', farePerStage: 5 },
+            { id: 'r329', busNumber: '364A', type: 'Ordinary', stops: ['Majestic', 'KG Road', 'Mico Shramajivi Col'], platform: '13', farePerStage: 5 },
+            { id: 'r330', busNumber: '369H', type: 'Ordinary', stops: ['Majestic', 'KG Road', 'Mico Shramajivi Col'], platform: '15', farePerStage: 5 },
+            { id: 'r331', busNumber: '99B', type: 'Ordinary', stops: ['Majestic', 'YPR Main Road', 'Mohankumar Nagar'], platform: '22', farePerStage: 6 },
+            { id: 'r332', busNumber: '333H', type: 'Ordinary', stops: ['Majestic', 'Richmond Road', 'Mayohall', 'Mune Kolalu'], platform: '17', farePerStage: 5 },
+            { id: 'r333', busNumber: '36D', type: 'Ordinary', stops: ['Majestic', 'Muneshwara Blk', 'Muneshwara Nagar'], platform: '10', farePerStage: 5 },
+            { id: 'r334', busNumber: '43C', type: 'Ordinary', stops: ['Majestic', 'Kereodi', 'Disoja Nagar', 'Muneshwara Nagar'], platform: '9', farePerStage: 5 },
+            { id: 'r335', busNumber: '255C', type: 'Ordinary', stops: ['Majestic', 'Central', 'Muniswamappa Layout'], platform: '20', farePerStage: 6 },
+            { id: 'r336', busNumber: '271K, 271L', type: 'Ordinary', stops: ['Majestic', 'Central', 'Malleshwaram', 'Muthyala Nagar'], platform: '22', farePerStage: 6 },
+            { id: 'r337', busNumber: '329H', type: 'Ordinary', stops: ['Majestic', 'Muttasandra'], platform: '15', farePerStage: 5 },
+            { id: 'r338', busNumber: '43', type: 'Ordinary', stops: ['Majestic', 'Ashram', 'Mysore Bank Col.'], platform: '9', farePerStage: 5 },
+            { id: 'r339', busNumber: '405B', type: 'Ordinary', stops: ['Majestic', 'Magadi Road', 'ORR', 'Nagadevanahalli'], platform: '4', farePerStage: 5 },
+            { id: 'r340', busNumber: '238A', type: 'Ordinary', stops: ['Majestic', 'Mudalapalya', 'Prashanth Nagar', 'Nagrabhavi'], platform: '4', farePerStage: 5 },
+            { id: 'r341', busNumber: '244C', type: 'Ordinary', stops: ['Majestic', 'RNR 6 Blk', 'Nagarabhavi 10Blk'], platform: '4', farePerStage: 5 },
+            { id: 'r342', busNumber: '238C', type: 'Ordinary', stops: ['Majestic', 'Kalyana Nagar', 'Nagrabhavi 5 Blk'], platform: '19A', farePerStage: 5 },
+            { id: 'r343', busNumber: '292B', type: 'Ordinary', stops: ['Majestic', 'Cant Rly Station', 'Nagenahalli'], platform: '19', farePerStage: 5 },
+            { id: 'r344', busNumber: '279', type: 'Ordinary', stops: ['Majestic', 'Anandrao Circle', 'Shivananda', 'Nagashettihalli'], platform: '23', farePerStage: 6 },
+            { id: 'r345', busNumber: '315N', type: 'Ordinary', stops: ['Majestic', 'KG Road', 'Richmond Road', 'Nagondanahalli'], platform: '17', farePerStage: 5 },
+            { id: 'r346', busNumber: '210Z', type: 'Ordinary', stops: ['Majestic', 'NR Road', 'HB Samaja', 'Naidu Layout'], platform: '12', farePerStage: 5 },
+            { id: 'r347', busNumber: '80A, 80D', type: 'Ordinary', stops: ['Majestic', 'RNR T Blk', 'ESI', 'Balaji Temple', 'Nandini Layout'], platform: '6', farePerStage: 5 },
+            { id: 'r348', busNumber: '351A', type: 'Ordinary', stops: ['Majestic', 'JC Road', 'Lalbagh Road', 'Narayana Ghatta'], platform: '15', farePerStage: 5 },
+            { id: 'r349', busNumber: '365', type: 'Ordinary', stops: ['Majestic', 'Mission Road', 'KH Road', 'National Park'], platform: '15', farePerStage: 5 },
+            { id: 'r350', busNumber: '145', type: 'Ordinary', stops: ['Majestic', 'Philomina', 'Neelasandra'], platform: '16', farePerStage: 5 },
+            { id: 'r351', busNumber: '258B', type: 'Ordinary', stops: ['Majestic', 'Central', 'Malleshwaram', 'Tata Inst', 'Nelamangala'], platform: '20', farePerStage: 6 },
+            { id: 'r352', busNumber: '258C', type: 'Ordinary', stops: ['Majestic', 'Central', 'Malleshwaram', 'Tata Inst', 'Nelamangala'], platform: '20', farePerStage: 6 },
+            { id: 'r353', busNumber: '406', type: 'Ordinary', stops: ['Majestic', 'Anandrao Circle', 'Shivananda', 'Nelamangala'], platform: '23', farePerStage: 6 },
+            { id: 'r354', busNumber: '333G', type: 'Ordinary', stops: ['Majestic', 'KG Road', 'Richmond Road', 'Mayohall', 'Nellurhalli'], platform: '17', farePerStage: 5 },
+            { id: 'r355', busNumber: '323F', type: 'Ordinary', stops: ['Majestic', 'KG Road', 'Richmond Road', 'Mayohall', 'Airport Road', 'Nerige'], platform: '17', farePerStage: 6 },
+            { id: 'r356', busNumber: '31', type: 'Ordinary', stops: ['Majestic', 'Nettakallappa Circle', 'RK Ashram', 'NR Colony'], platform: '8', farePerStage: 5 },
+            { id: 'r357', busNumber: '321D', type: 'Ordinary', stops: ['Majestic', 'MG Road', 'Nakote'], platform: '17', farePerStage: 5 },
+            { id: 'r358', busNumber: '238', type: 'Ordinary', stops: ['Majestic', 'Mudalapalya', 'Nrupathunga Nagar'], platform: '19A', farePerStage: 5 },
+            { id: 'r359', busNumber: '364F', type: 'Ordinary', stops: ['Majestic', 'JC Road', 'Nyanappanahalli'], platform: '15', farePerStage: 5 },
+            { id: 'r360', busNumber: '122', type: 'Ordinary', stops: ['Majestic', 'Mosque Road', 'Old Byppanahalli'], platform: '19', farePerStage: 5 },
+            { id: 'r361', busNumber: '168F', type: 'Ordinary', stops: ['Majestic', 'Gurappanapalya', 'Old Gurappanapalya'], platform: '14', farePerStage: 5 },
+            { id: 'r362', busNumber: '12B', type: 'Ordinary', stops: ['Majestic', 'BSK 2 Stg', 'Nanda Talkies', 'Padmanabhanagar'], platform: '11', farePerStage: 5 },
+            { id: 'r363', busNumber: '12C', type: 'Ordinary', stops: ['Majestic', 'Mini Zoo', 'Padmanabhanagar'], platform: '11', farePerStage: 5 },
+            { id: 'r364', busNumber: '235E', type: 'Ordinary', stops: ['Majestic', 'NR Road', 'Royan Circle', 'Papareddy Palya'], platform: '19A', farePerStage: 5 },
+            { id: 'r365', busNumber: '279K', type: 'Ordinary', stops: ['Majestic', 'Anandrao Circle', 'Shivananda', 'Patelappa Layout'], platform: '23', farePerStage: 6 },
+            { id: 'r366', busNumber: '271K', type: 'Ordinary', stops: ['Majestic', 'Malleshwaram', 'Mathikere', 'Pattabhinagar'], platform: '22', farePerStage: 6 },
+            { id: 'r367', busNumber: 'KSRTC', type: 'KSRTC', stops: ['Majestic', 'Pichaguntarahalli'], platform: '17', farePerStage: 8 },
+            { id: 'r368', busNumber: '319G', type: 'Ordinary', stops: ['Majestic', 'NR Road', 'Richmond Road', 'Pattandur Agrahara'], platform: '17', farePerStage: 5 },
+            { id: 'r369', busNumber: '252', type: 'Ordinary', stops: ['Majestic', 'NR Road', 'KG Road', 'Central', 'Peenya 2 Stg'], platform: '20', farePerStage: 6 },
+            { id: 'r370', busNumber: '252F', type: 'Ordinary', stops: ['Majestic', 'Sujatha', 'Rama Mandir', 'ESI', 'Peenya 2 Stg'], platform: '7', farePerStage: 5 },
+            { id: 'r371', busNumber: '261', type: 'Ordinary', stops: ['Majestic', 'Bashyam Nagar', 'Milk Colony', 'Peenya 2 Stg'], platform: '20', farePerStage: 6 },
+            { id: 'r372', busNumber: '273, 273D', type: 'Ordinary', stops: ['Majestic', 'Central', 'Malleshwaram', 'Peenya 2 Stg'], platform: '22', farePerStage: 6 },
+            { id: 'r373', busNumber: '305Q', type: 'Ordinary', stops: ['Majestic', 'KG Road', 'Richmond Road', 'Picha Guntara Halli'], platform: '17', farePerStage: 5 },
+            { id: 'r374', busNumber: '85', type: 'Ordinary', stops: ['Majestic', 'Central', 'Devaiah Park', 'Prakash Nagar'], platform: '21', farePerStage: 5 },
+            { id: 'r375', busNumber: '383A', type: 'Ordinary', stops: ['Majestic', 'Richmond Road', 'Pujena Agrahara'], platform: '17', farePerStage: 5 },
+            { id: 'r376', busNumber: '78', type: 'Ordinary', stops: ['Majestic', 'Sujatha', 'ESI', 'RNR 1 Blk', 'Rajaji Nagar 1 Blk'], platform: '6', farePerStage: 5 },
+            { id: 'r377', busNumber: '252D', type: 'Ordinary', stops: ['Majestic', 'Central', 'Malleshwaram', 'Tata Inst', 'Rajani Farm'], platform: '20', farePerStage: 6 },
+            { id: 'r378', busNumber: '251B', type: 'Ordinary', stops: ['Majestic', 'Central', 'Malleshwaram', 'Rajanukunte'], platform: '20', farePerStage: 6 },
+            { id: 'r379', busNumber: '252H', type: 'Ordinary', stops: ['Majestic', 'Sujatha', 'Rama Mandir', 'Rajivgandhi Nagar'], platform: '7', farePerStage: 5 },
+            { id: 'r380', busNumber: '98B', type: 'Ordinary', stops: ['Majestic', 'Rajmahal Vilas 2 Stg'], platform: '22', farePerStage: 6 },
+            { id: 'r381', busNumber: '269', type: 'Ordinary', stops: ['Majestic', 'KG Road', 'Central', 'Ramachandrapura'], platform: '22', farePerStage: 6 },
+            { id: 'r382', busNumber: '315L', type: 'Ordinary', stops: ['Majestic', 'KG Road', 'Richmond Road', 'Ramamurthy Nagar'], platform: '17', farePerStage: 5 },
+            { id: 'r383', busNumber: '370E', type: 'Ordinary', stops: ['Majestic', 'KG Road', 'Ramanayakana Doddi'], platform: '15', farePerStage: 5 },
+            { id: 'r384', busNumber: '235D', type: 'Ordinary', stops: ['Majestic', 'ORR', 'Nagarabhavi Circle', 'Mudalapalya', 'Ramasandra'], platform: '4', farePerStage: 5 },
+            { id: 'r385', busNumber: '315J', type: 'Ordinary', stops: ['Majestic', 'KG Road', 'Richmond Road', 'Mayohall', 'Halasur', 'Rampura'], platform: '17', farePerStage: 5 },
+            { id: 'r386', busNumber: '353', type: 'Ordinary', stops: ['Majestic', 'Ramakrishanapura'], platform: '15', farePerStage: 5 },
+            { id: 'r387', busNumber: '346E', type: 'Ordinary', stops: ['Majestic', 'Rayasandra'], platform: '17', farePerStage: 5 },
+            { id: 'r388', busNumber: '250L', type: 'Ordinary', stops: ['Majestic', 'Central', 'Malleshwaram', 'Tata Inst', 'Ravindra Nagar'], platform: '20', farePerStage: 6 },
+            { id: 'r389', busNumber: '291H', type: 'Ordinary', stops: ['Majestic', 'Vidhanasoudha', 'RK Hegde Nagar'], platform: '19', farePerStage: 5 },
+            { id: 'r390', busNumber: '104', type: 'Ordinary', stops: ['Majestic', 'Vyalikaval', 'Central', 'Sadashiva Nagar'], platform: '24', farePerStage: 5 },
+            { id: 'r391', busNumber: '288F', type: 'Ordinary', stops: ['Majestic', 'Anandrao Circle', 'Shivananda', 'Sahakara Nagar'], platform: '23', farePerStage: 6 },
+            { id: 'r392', busNumber: '365B', type: 'Ordinary', stops: ['Majestic', 'Mission Road', 'KH Road', 'Wilson Garden', 'Sakalwara'], platform: '15', farePerStage: 5 },
+            { id: 'r393', busNumber: '51B', type: 'Ordinary', stops: ['Majestic', 'Prashanth Nagar', 'Vijaya Nagar', 'Sarswathi Nagar'], platform: '3', farePerStage: 5 },
+            { id: 'r394', busNumber: '342F', type: 'Ordinary', stops: ['Majestic', 'Lalbagh Road', 'Lalbagh Main Gate', 'Sarjapura'], platform: '15', farePerStage: 6 },
+            { id: 'r395', busNumber: '315F', type: 'Ordinary', stops: ['Majestic', 'KG Road', 'Richmond Road', 'Mayohall', 'Halasur', 'Seegehalli'], platform: '17', farePerStage: 5 },
+            { id: 'r396', busNumber: '333N', type: 'Ordinary', stops: ['Majestic', 'KG Road', 'Richmond Road', 'Seetharam Palya'], platform: '17', farePerStage: 5 },
+            { id: 'r397', busNumber: '225J', type: 'Ordinary', stops: ['Majestic', 'Goods Shed', 'Royan Circle', 'Shakthi Resorts'], platform: '19A', farePerStage: 5 },
+            { id: 'r398', busNumber: '80E', type: 'Ordinary', stops: ['Majestic', 'Mahalakshmi Layout', 'Balaji Temple', 'Shankar Nagar'], platform: '6', farePerStage: 5 },
+            { id: 'r399', busNumber: '96G', type: 'Ordinary', stops: ['Majestic', 'Kamala Nagar', 'Shankar Nagar BusStation'], platform: '5', farePerStage: 5 },
+            { id: 'r400', busNumber: '315P', type: 'Ordinary', stops: ['Majestic', 'KG Road', 'Richmond Road', 'Mayohall', 'Shanthi Layout'], platform: '17', farePerStage: 5 },
+            { id: 'r401', busNumber: '369D', type: 'Ordinary', stops: ['Majestic', 'Mission Road', 'Shanthiniketan Layout'], platform: '15', farePerStage: 5 },
+            { id: 'r402', busNumber: '365E', type: 'Ordinary', stops: ['Majestic', 'Mission Road', 'Shanubhoghanahalli'], platform: '15', farePerStage: 5 },
+            { id: 'r403', busNumber: '146B', type: 'Ordinary', stops: ['Majestic', 'Ejipura', 'Vannarpet', 'Austin Town', 'Shinivagilu'], platform: '16', farePerStage: 5 },
+            { id: 'r404', busNumber: '129', type: 'Ordinary', stops: ['Majestic', 'GPO', 'KG Road', 'Shivaji Nagar Bus Station'], platform: '19', farePerStage: 5 },
+            { id: 'r405', busNumber: '316M', type: 'Ordinary', stops: ['Majestic', 'KG Road', 'Richmond Road', 'Mayohall', 'Halasur', 'Singahalli'], platform: '17', farePerStage: 5 },
+            { id: 'r406', busNumber: '271C', type: 'Ordinary', stops: ['Majestic', 'Central', 'Malleshwaram', 'Tata Inst', 'Singapura'], platform: '22', farePerStage: 6 },
+            { id: 'r407', busNumber: '211B', type: 'Ordinary', stops: ['Majestic', 'NR Road', 'HB Samaja', 'Somanahalli'], platform: '12', farePerStage: 5 },
+            { id: 'r408', busNumber: '271G', type: 'Ordinary', stops: ['Majestic', 'Central', 'Malleshwaram', 'Somashettahalli'], platform: '22', farePerStage: 6 },
+            { id: 'r409', busNumber: '347E', type: 'Ordinary', stops: ['Majestic', 'JC Road', 'Somasundara Palya'], platform: '15', farePerStage: 5 },
+            { id: 'r410', busNumber: '305S', type: 'Ordinary', stops: ['Majestic', 'KG Road', 'Richmond Road', 'Soukya Hospital'], platform: '7', farePerStage: 5 },
+            { id: 'r411', busNumber: '235F', type: 'Ordinary', stops: ['Majestic', 'Sports Authority of India'], platform: '19A', farePerStage: 5 },
+            { id: 'r412', busNumber: '36', type: 'Ordinary', stops: ['Majestic', 'Hanumanth Nagar', 'Sajjanrao Circle', 'Sree Nagar'], platform: '10', farePerStage: 5 },
+            { id: 'r413', busNumber: '215G', type: 'Ordinary', stops: ['Majestic', 'NR Road', 'HB Samaja', 'Sreenivagilu'], platform: '12', farePerStage: 5 },
+            { id: 'r414', busNumber: '343C', type: 'Ordinary', stops: ['Majestic', 'JC Road', 'Lalbagh Road', 'Sri Ram Nagar'], platform: '15', farePerStage: 5 },
+            { id: 'r415', busNumber: '335A', type: 'Ordinary', stops: ['Majestic', 'KG Road', 'Sri Sathya Sai Hospital'], platform: '17', farePerStage: 5 },
+            { id: 'r416', busNumber: '246B', type: 'Ordinary', stops: ['Majestic', 'Magadi Road', 'Srigandada Kaval'], platform: '4', farePerStage: 5 },
+            { id: 'r417', busNumber: '237A', type: 'Ordinary', stops: ['Majestic', 'Prashanth Nagar', 'Vijaya Nagar', 'Srinivasa Nagar'], platform: '4', farePerStage: 5 },
+            { id: 'r418', busNumber: '355A', type: 'Ordinary', stops: ['Majestic', 'JC Road', 'Lalbagh Road', 'Dairy Circle', 'Srirampura'], platform: '15', farePerStage: 5 },
+            { id: 'r419', busNumber: '315A', type: 'Ordinary', stops: ['Majestic', 'KG Road', 'Richmond Road', 'Suddaguntepalya'], platform: '17', farePerStage: 5 },
+            { id: 'r420', busNumber: '298N', type: 'Ordinary', stops: ['Majestic', 'Anandrao Circle', 'Shivananda', 'Bellary Road', 'Sulebele'], platform: '23', farePerStage: 6 },
+            { id: 'r421', busNumber: '235D', type: 'Ordinary', stops: ['Majestic', 'Sulikere'], platform: '19', farePerStage: 5 },
+            { id: 'r422', busNumber: '80G', type: 'Ordinary', stops: ['Majestic', 'Swathanthra Yodhara Nagar'], platform: '7', farePerStage: 5 },
+            { id: 'r423', busNumber: '335A', type: 'Ordinary', stops: ['Majestic', 'Saibaba Hospital'], platform: '17', farePerStage: 5 },
+            { id: 'r424', busNumber: '346', type: 'Ordinary', stops: ['Majestic', 'Shikari palya'], platform: '15', farePerStage: 5 },
+            { id: 'r425', busNumber: '315C', type: 'Ordinary', stops: ['Majestic', 'Sadananda Nagar'], platform: '17', farePerStage: 5 },
+            { id: 'r426', busNumber: '240D, 242C', type: 'Ordinary', stops: ['Majestic', 'Magadi Road', 'Sunkada Katte'], platform: '4', farePerStage: 5 },
+            { id: 'r427', busNumber: '114C', type: 'Ordinary', stops: ['Majestic', 'Sultan Palya'], platform: '25', farePerStage: 5 },
+            { id: 'r428', busNumber: '305M', type: 'Ordinary', stops: ['Majestic', 'KG Road', 'Richmond Road', 'Tarabanahalli'], platform: '17', farePerStage: 5 },
+            { id: 'r429', busNumber: '279C', type: 'Ordinary', stops: ['Majestic', 'Anandrao Circle', 'Shivananda', 'Tata Nagar'], platform: '23', farePerStage: 6 },
+            { id: 'r430', busNumber: '356A', type: 'Ordinary', stops: ['Majestic', 'JC Road', 'Lalbagh Road', 'Tattanahalli'], platform: '15', farePerStage: 5 },
+            { id: 'r431', busNumber: '25J', type: 'Ordinary', stops: ['Majestic', 'Jayadeva', 'Tavarekere'], platform: '13', farePerStage: 5 },
+            { id: 'r432', busNumber: '168D', type: 'Ordinary', stops: ['Majestic', 'Dairy Circle', 'Tavarekere'], platform: '14', farePerStage: 5 },
+            { id: 'r433', busNumber: '242B', type: 'Ordinary', stops: ['Majestic', 'Magadi Road', 'Tavarekere'], platform: '4', farePerStage: 5 },
+            { id: 'r434', busNumber: '348, 348K', type: 'Ordinary', stops: ['Majestic', 'JC Road', 'Lalbagh', 'Teachers Col'], platform: '15', farePerStage: 5 },
+            { id: 'r435', busNumber: '87J', type: 'Ordinary', stops: ['Majestic', 'Hampi Nagar', 'PipeLine', 'Telecom Layout'], platform: '1', farePerStage: 5 },
+            { id: 'r436', busNumber: '290M', type: 'Ordinary', stops: ['Majestic', 'KG Road', 'Vidhanasoudha', 'Telecom Layout'], platform: '23', farePerStage: 6 },
+            { id: 'r437', busNumber: '58C', type: 'Ordinary', stops: ['Majestic', 'Timberyard Layout', 'Telecom Layout'], platform: '19A', farePerStage: 5 },
+            { id: 'r438', busNumber: '301F', type: 'Ordinary', stops: ['Majestic', 'KG Road', 'ThambuchettyPalya'], platform: '19', farePerStage: 5 },
+            { id: 'r439', busNumber: '250B', type: 'Ordinary', stops: ['Majestic', 'Central', 'Malleshwaram', 'Thammenahalli'], platform: '20', farePerStage: 6 },
+            { id: 'r440', busNumber: '290B', type: 'Ordinary', stops: ['Majestic', 'Vidhanasoudha', 'Thanisandra'], platform: '19', farePerStage: 5 },
+            { id: 'r441', busNumber: '381', type: 'Ordinary', stops: ['Majestic', 'Richmond Road', 'Thimmsandra'], platform: '17', farePerStage: 5 },
+            { id: 'r442', busNumber: '250J, 250B', type: 'Ordinary', stops: ['Majestic', 'Central', 'Thota Guddada Haiti'], platform: '20', farePerStage: 6 },
+            { id: 'r443', busNumber: '31E', type: 'Ordinary', stops: ['Majestic', 'Thyagaraja Nagar'], platform: '8', farePerStage: 5 },
+            { id: 'r444', busNumber: '243D', type: 'Ordinary', stops: ['Majestic', 'Magadi Road', 'Tigalarapalya'], platform: '4', farePerStage: 5 },
+            { id: 'r445', busNumber: '265B', type: 'Ordinary', stops: ['Majestic', 'Magadi Road', 'Tigalarapalya'], platform: '4', farePerStage: 5 },
+            { id: 'r446', busNumber: '58', type: 'Ordinary', stops: ['Majestic', 'Mysore Road', 'Timber YaRoad Layout'], platform: '19A', farePerStage: 5 },
+            { id: 'r447', busNumber: '226J', type: 'Ordinary', stops: ['Majestic', 'Timmappanapalya'], platform: '19A', farePerStage: 5 },
+            { id: 'r448', busNumber: '315W', type: 'Ordinary', stops: ['Majestic', 'KG Road', 'Richmond Road', 'Udaya Nagar'], platform: '17', farePerStage: 5 },
+            { id: 'r449', busNumber: '234E', type: 'Ordinary', stops: ['Majestic', 'KG Road', 'NR Road', 'Ullal Sat Town'], platform: '19A', farePerStage: 5 },
+            { id: 'r450', busNumber: '210N', type: 'Ordinary', stops: ['Majestic', 'NR Road', 'RK Ashram', 'TR Nagar', 'Uttarahalli'], platform: '12', farePerStage: 5 },
+            { id: 'r451', busNumber: '211J', type: 'Ordinary', stops: ['Majestic', 'NR Road', 'HB-Samaja', 'Shanthi', 'Vaderahalli'], platform: '12', farePerStage: 5 },
+            { id: 'r452', busNumber: '328F', type: 'Ordinary', stops: ['Majestic', 'KG Road', 'Richmond Road', 'Mayohall', 'Valepura'], platform: '17', farePerStage: 5 },
+            { id: 'r453', busNumber: '334D', type: 'Ordinary', stops: ['Majestic', 'KG Road', 'Richmond Road', 'Mayohall', 'Airport Road', 'Varthur'], platform: '7', farePerStage: 6 },
+            { id: 'r454', busNumber: '210E', type: 'Ordinary', stops: ['Majestic', 'NR Road', 'HB Samaja', 'Nanda', 'Vasanthapura'], platform: '12', farePerStage: 5 },
+            { id: 'r455', busNumber: '271E', type: 'Ordinary', stops: ['Majestic', 'Central', 'Malleshwaram', 'Tata Inst', 'Veera Sagara'], platform: '22', farePerStage: 6 },
+            { id: 'r456', busNumber: '43D', type: 'Ordinary', stops: ['Majestic', 'Hoskerehalli Crs', 'Sita Circle', 'Veerabhadra Nagar'], platform: '9', farePerStage: 5 },
+            { id: 'r457', busNumber: '171D', type: 'Ordinary', stops: ['Majestic', 'BDA Cmplx', 'BMTC Depot', 'Dairy Circle', 'Venkatapura'], platform: '14', farePerStage: 5 },
+            { id: 'r458', busNumber: '98F', type: 'Ordinary', stops: ['Majestic', 'Sanjaygandhi Nagar', 'Vidhanasoudha Nagar'], platform: '21', farePerStage: 5 },
+            { id: 'r459', busNumber: '269B', type: 'Ordinary', stops: ['Majestic', 'Central', 'Malleshwaram', 'Vidyaranyapura'], platform: '22', farePerStage: 6 },
+            { id: 'r460', busNumber: '275D', type: 'Ordinary', stops: ['Majestic', 'Central', 'Malleshwaram', 'Vidyaranyapura'], platform: '22', farePerStage: 6 },
+            { id: 'r461', busNumber: '276', type: 'Ordinary', stops: ['Majestic', 'Central', 'Malleshwaram', 'Vidyaranyapura'], platform: '22', farePerStage: 6 },
+            { id: 'r462', busNumber: '314D', type: 'Ordinary', stops: ['Majestic', 'KG Road', 'Richmond Road', 'Mayohall', 'Vignana Nagar'], platform: '18', farePerStage: 5 },
+            { id: 'r463', busNumber: '265D', type: 'Ordinary', stops: ['Majestic', 'Magadi Road', 'Vigneshwara Nagar'], platform: '4', farePerStage: 5 },
+            { id: 'r464', busNumber: '364C', type: 'Ordinary', stops: ['Majestic', 'JC Road', 'VijayaBank Layout'], platform: '13', farePerStage: 5 },
+            { id: 'r465', busNumber: '61', type: 'Ordinary', stops: ['Majestic', 'Magadi Road', 'Vijaya Nagar'], platform: '2', farePerStage: 5 },
+            { id: 'r466', busNumber: '61D', type: 'Ordinary', stops: ['Majestic', 'Magadi Road', 'Vijaya Nagar'], platform: '3', farePerStage: 5 },
+            { id: 'r467', busNumber: '87', type: 'Ordinary', stops: ['Majestic', 'Hampi Nagar', 'Pipeline', 'Vijaya Nagar East'], platform: '1', farePerStage: 5 },
+            { id: 'r468', busNumber: '87A', type: 'Ordinary', stops: ['Majestic', 'Hampi Nagar', 'Pipeline', 'Vijaya Nagar East'], platform: '1', farePerStage: 5 },
+            { id: 'r469', busNumber: '87C', type: 'Ordinary', stops: ['Majestic', 'Hampi Nagar', 'Pipeline', 'Vijaya Nagar East'], platform: '1', farePerStage: 5 },
+            { id: 'r470', busNumber: '61E', type: 'Ordinary', stops: ['Majestic', 'Maruthi Mandir', 'Vijaya Nagar'], platform: '3', farePerStage: 5 },
+            { id: 'r471', busNumber: '315G, 315H', type: 'Ordinary', stops: ['Majestic', 'KG Road', 'Richmond Road', 'Mayohall', 'Vijanapura'], platform: '17', farePerStage: 5 },
+            { id: 'r472', busNumber: '54E', type: 'Ordinary', stops: ['Majestic', 'Mysore Road', 'NR Road', 'KG Road', 'Vinayaka Nagar'], platform: '19A', farePerStage: 5 },
+            { id: 'r473', busNumber: '415B', type: 'Ordinary', stops: ['Majestic', 'KG Road', 'Tel Exg.', 'Viswanathanagenahalli'], platform: '25', farePerStage: 5 },
+            { id: 'r474', busNumber: '146', type: 'Ordinary', stops: ['Majestic', 'Vannarpet', 'Austin Town', 'Philomina', 'Viveka Nagar'], platform: '16', farePerStage: 5 },
+            { id: 'r475', busNumber: '43A', type: 'Ordinary', stops: ['Majestic', 'Hanumanth Nagar', 'Vivekananda Nagar'], platform: '9', farePerStage: 5 },
+            { id: 'r476', busNumber: '49', type: 'Ordinary', stops: ['Majestic', 'Kalasipalya', 'Chamarajpet', 'Vittal Nagar'], platform: '8', farePerStage: 5 },
+            { id: 'r477', busNumber: '343K', type: 'Ordinary', stops: ['Majestic', 'Forum PVR', 'Vishwapriya'], platform: '15', farePerStage: 5 },
+            { id: 'r478', busNumber: '215M', type: 'Ordinary', stops: ['Majestic', 'Vinayaka Nagar'], platform: '11', farePerStage: 5 },
+            { id: 'r479', busNumber: '335G', type: 'Ordinary', stops: ['Majestic', 'Vydehi Hospital'], platform: '17', farePerStage: 5 },
+            { id: 'r480', busNumber: '305L', type: 'Ordinary', stops: ['Majestic', 'KG Road', 'Richmond Road', 'Mayohall', 'Halasur', 'Wagata'], platform: '17', farePerStage: 5 },
+            { id: 'r481', busNumber: '296A', type: 'Ordinary', stops: ['Majestic', 'Vidhanasoudha', 'Yarappanahalli'], platform: '19', farePerStage: 5 },
+            { id: 'r482', busNumber: '271H', type: 'Ordinary', stops: ['Majestic', 'Central', 'Malleshwaram', 'Tata Inst.', 'Yelahanka'], platform: '22', farePerStage: 6 },
+            { id: 'r483', busNumber: '276J', type: 'Ordinary', stops: ['Majestic', 'Central', 'Malleshwaram', 'Tata Inst.', 'Yelahanka'], platform: '22', farePerStage: 6 },
+            { id: 'r484', busNumber: '284D', type: 'Ordinary', stops: ['Majestic', 'Anandrao Circle', 'Yelahanka Sat Town'], platform: '23', farePerStage: 6 },
+            { id: 'r485', busNumber: '402D', type: 'Ordinary', stops: ['Majestic', 'Anandrao Circle', 'Yelahanka ST 4 Ph'], platform: '23', farePerStage: 6 },
+            { id: 'r486', busNumber: '402B', type: 'Ordinary', stops: ['Majestic', 'Anandrao Circle', 'Yelahanka ST 5 Ph'], platform: '23', farePerStage: 6 },
+            { id: 'r487', busNumber: '90', type: 'Ordinary', stops: ['Majestic', 'Yeshawanthpura'], platform: '6', farePerStage: 5 },
+            { id: 'r488', busNumber: '83C', type: 'Ordinary', stops: ['Majestic', 'Srirampura', 'Yeshawanthpura'], platform: '21', farePerStage: 5 },
+            { id: 'r489', busNumber: '284', type: 'Ordinary', stops: ['Majestic', 'Byatarayanapura', 'Yelahanka'], platform: '23', farePerStage: 6 },
+            { id: 'r490', busNumber: '90E', type: 'Ordinary', stops: ['Majestic', 'Yeshawanthpura Rly Station'], platform: '21', farePerStage: 5 },
+            { id: 'r491', busNumber: '82C', type: 'Ordinary', stops: ['Majestic', 'Central', 'Devaiah Park', 'Yeshawanthpura'], platform: '21', farePerStage: 5 },
+            { id: 'r492', busNumber: '270D', type: 'Ordinary', stops: ['Shivaji Nagar', 'Cant Rly Station', 'Jayamahal Road', 'CV Raman Road', 'Abbigere'], platform: '3', farePerStage: 5 },
+            { id: 'r493', busNumber: '330B', type: 'Ordinary', stops: ['Shivaji Nagar', 'GPO', 'Cubbon Road', 'Trinity Church', 'AECS Layout'], platform: '7', farePerStage: 5 },
+            { id: 'r494', busNumber: '290F', type: 'Ordinary', stops: ['Shivaji Nagar', 'Cant Rly Station', 'Bamboo Bazar', 'Agrahara Layout'], platform: '13', farePerStage: 5 },
+            { id: 'r495', busNumber: '287B, 287K', type: 'Ordinary', stops: ['Shivaji Nagar', 'Cant Rly Station', 'Bellary Road', 'Amarjyothi Nagar'], platform: '2', farePerStage: 5 },
+            { id: 'r496', busNumber: '290H, 290K', type: 'Ordinary', stops: ['Shivaji Nagar', 'KG Road', 'Vidhanasoudha', 'Ambedkar Colg'], platform: '13', farePerStage: 5 },
+            { id: 'r497', busNumber: '107', type: 'Ordinary', stops: ['Shivaji Nagar', 'Bellary Road', 'Ananda Nagar'], platform: '1', farePerStage: 5 },
+            { id: 'r498', busNumber: '270', type: 'Ordinary', stops: ['Shivaji Nagar', 'Cant Rly Station', 'Jayamahal Road', 'Anchepalya'], platform: '3', farePerStage: 5 },
+            { id: 'r499', busNumber: '215V', type: 'Ordinary', stops: ['Shivaji Nagar', 'Nanda Talkies', 'Deepak Nur Home', 'Anjanapura'], platform: '15', farePerStage: 5 },
+            { id: 'r500', busNumber: '246A', type: 'Ordinary', stops: ['Shivaji Nagar', 'GPO', 'Annapoorneshwari Nagar'], platform: '4', farePerStage: 5 },
+            { id: 'r501', busNumber: '13H', type: 'Ordinary', stops: ['Shivaji Nagar', 'Ittamadu', 'ORR', 'Arehalli AGS Layout'], platform: '12', farePerStage: 5 },
+            { id: 'r502', busNumber: '330M', type: 'Ordinary', stops: ['Shivaji Nagar', 'GPO', 'Cubbon Road', 'Trinity Church', 'Ashwath Nagar'], platform: '7', farePerStage: 5 },
+            { id: 'r503', busNumber: '360F, 360G', type: 'Ordinary', stops: ['Shivaji Nagar', 'SBI', 'Richmond Road', 'KH Road', 'Wilson Garden', 'Attibele'], platform: '12', farePerStage: 6 },
+            { id: 'r504', busNumber: '404C', type: 'Ordinary', stops: ['Shivaji Nagar', 'Cant Rly Station', 'Jayamahal Road', 'Matadahalli', 'Atturu'], platform: '2', farePerStage: 5 },
+            { id: 'r505', busNumber: '311E', type: 'Ordinary', stops: ['Shivaji Nagar', 'GPO', 'Cubbon Road', 'Ayyappa Nagar'], platform: '8', farePerStage: 5 },
+            { id: 'r506', busNumber: '300D', type: 'Ordinary', stops: ['Shivaji Nagar', 'Cant Rly Station', 'B Channasandra'], platform: '14', farePerStage: 5 },
+            { id: 'r507', busNumber: '300', type: 'Ordinary', stops: ['Shivaji Nagar', 'Cant Rly Station', 'Banasawadi'], platform: '14', farePerStage: 5 },
+            { id: 'r508', busNumber: '161F', type: 'Ordinary', stops: ['Shivaji Nagar', 'Bannerghatta Road', 'Dairy Circle', 'Balaji Nagar'], platform: '11', farePerStage: 5 },
+            { id: 'r509', busNumber: '34A', type: 'Ordinary', stops: ['Shivaji Nagar', 'Banashankari 3 Stg 2Ph'], platform: '10', farePerStage: 5 },
+            { id: 'r510', busNumber: '13E', type: 'Ordinary', stops: ['Shivaji Nagar', 'Banashankari 3 Stg 2Ph'], platform: '12', farePerStage: 5 },
+            { id: 'r511', busNumber: '13', type: 'Ordinary', stops: ['Shivaji Nagar', 'Banashankari Bus Station'], platform: '12', farePerStage: 5 },
+            { id: 'r512', busNumber: '79B', type: 'Ordinary', stops: ['Shivaji Nagar', 'Bashyam Nagar', 'Bandi Reddy Circle'], platform: '4', farePerStage: 5 },
+            { id: 'r513', busNumber: '239B', type: 'Ordinary', stops: ['Shivaji Nagar', 'Mysore Road', 'Bang Childrens Hospital'], platform: '15', farePerStage: 5 },
+            { id: 'r514', busNumber: '239D', type: 'Ordinary', stops: ['Shivaji Nagar', 'GPO', 'Kasturba Road', 'Bangarappa Nagar'], platform: '15', farePerStage: 5 },
+            { id: 'r515', busNumber: '196', type: 'Ordinary', stops: ['Shivaji Nagar', 'Bapuji Layout (Saraswathi Nagar)'], platform: '6', farePerStage: 5 },
+            { id: 'r516', busNumber: '58', type: 'Ordinary', stops: ['Shivaji Nagar', 'Dasarahalli', 'Basaveswara Nagar'], platform: '4', farePerStage: 5 },
+            { id: 'r517', busNumber: '362C', type: 'Ordinary', stops: ['Shivaji Nagar', 'SBI', 'Richmond Road', 'KH Road', 'Begur'], platform: '12', farePerStage: 6 },
+            { id: 'r518', busNumber: '331E', type: 'Ordinary', stops: ['Shivaji Nagar', 'GPO', 'Cubbon Road', 'Trinity Church', 'Belthur'], platform: '7', farePerStage: 5 },
+            { id: 'r519', busNumber: '239A', type: 'Ordinary', stops: ['Shivaji Nagar', 'Mysore Road', 'Royan Circle', 'BEML 5Stg'], platform: '5', farePerStage: 5 },
+            { id: 'r520', busNumber: '278D', type: 'Ordinary', stops: ['Shivaji Nagar', 'Cant Rly Station', 'Jayamahal Road', 'Boopasandra'], platform: '2', farePerStage: 5 },
+            { id: 'r521', busNumber: '278E, 278Q', type: 'Ordinary', stops: ['Shivaji Nagar', 'Cant Rly Station', 'Boopasandra'], platform: '2', farePerStage: 5 },
+            { id: 'r522', busNumber: '226G', type: 'Ordinary', stops: ['Shivaji Nagar', 'GPO', 'Kasturba Road', 'NR Road', 'Mysore Road', 'Bidadi'], platform: '15', farePerStage: 6 },
+            { id: 'r523', busNumber: '287Q', type: 'Ordinary', stops: ['Shivaji Nagar', 'Cant Rly Station', 'Jayamahal Road', 'Boopasandra'], platform: '2', farePerStage: 5 },
+            { id: 'r524', busNumber: '50A', type: 'Ordinary', stops: ['Shivaji Nagar', 'Vittal Nagar', 'Brindavana Nagar'], platform: '15', farePerStage: 5 },
+            { id: 'r525', busNumber: '347G', type: 'Ordinary', stops: ['Shivaji Nagar', 'Richmond Road', 'KH Road', 'Central Jail'], platform: '12', farePerStage: 6 },
+            { id: 'r526', busNumber: '287P', type: 'Ordinary', stops: ['Shivaji Nagar', 'Cant Rly Station', 'Chamundi Nagar'], platform: '2', farePerStage: 5 },
+            { id: 'r527', busNumber: '195', type: 'Ordinary', stops: ['Shivaji Nagar', 'Incometax Layout', 'Vijaya Nagar', 'Chandra Layout'], platform: '6', farePerStage: 5 },
+            { id: 'r528', busNumber: '195A', type: 'Ordinary', stops: ['Shivaji Nagar', 'Chandra Layout 1 Stg'], platform: '6', farePerStage: 5 },
+            { id: 'r529', busNumber: '63A', type: 'Ordinary', stops: ['Shivaji Nagar', 'Chandra Layout 1 Stg'], platform: '6', farePerStage: 5 },
+            { id: 'r530', busNumber: '302J', type: 'Ordinary', stops: ['Shivaji Nagar', 'Cant Rly Station', 'Chelakere Extension'], platform: '14', farePerStage: 5 },
+            { id: 'r531', busNumber: '13F', type: 'Ordinary', stops: ['Shivaji Nagar', 'ORR', 'Chenammanakere Acuat'], platform: '1', farePerStage: 5 },
+            { id: 'r532', busNumber: '368D', type: 'Ordinary', stops: ['Shivaji Nagar', 'SBI', 'Chikka Kammanahalli'], platform: '12', farePerStage: 6 },
+            { id: 'r533', busNumber: '210Q', type: 'Ordinary', stops: ['Shivaji Nagar', 'KH Road', 'Wilson Garden', 'Chikkalsandra'], platform: '12', farePerStage: 6 },
+            { id: 'r534', busNumber: '125E', type: 'Ordinary', stops: ['Shivaji Nagar', 'CQAL Borebank Road', 'Chinnappa GaRoaden'], platform: '9', farePerStage: 5 },
+            { id: 'r535', busNumber: '267B', type: 'Ordinary', stops: ['Shivaji Nagar', 'Cant Rly Station', 'Chowdeshwari Nagar'], platform: '4', farePerStage: 5 },
+            { id: 'r536', busNumber: '287G', type: 'Ordinary', stops: ['Shivaji Nagar', 'Cant Rly Station', 'Coffee Board'], platform: '2', farePerStage: 5 },
+            { id: 'r537', busNumber: '128', type: 'Ordinary', stops: ['Shivaji Nagar', 'Coles Park', 'Lavanya', 'Cox Town'], platform: '17', farePerStage: 5 },
+            { id: 'r538', busNumber: '300F', type: 'Ordinary', stops: ['Shivaji Nagar', 'Cant Rly Station', 'Bamboo Bazar', 'Devasandra'], platform: '14', farePerStage: 5 },
+            { id: 'r539', busNumber: '223A', type: 'Ordinary', stops: ['Shivaji Nagar', 'GPO', 'Vidhanasoudha', 'Dodda Basthi'], platform: '15', farePerStage: 5 },
+            { id: 'r540', busNumber: '295B, 295C', type: 'Ordinary', stops: ['Shivaji Nagar', 'Cant Rly Station', 'Dodda Gubbi'], platform: '9', farePerStage: 5 },
+            { id: 'r541', busNumber: '330C', type: 'Ordinary', stops: ['Shivaji Nagar', 'GPO', 'Cubbon Road', 'Dodda Kannelli'], platform: '7', farePerStage: 5 },
+            { id: 'r542', busNumber: '330G', type: 'Ordinary', stops: ['Shivaji Nagar', 'GPO', 'Cubbon Road', 'Dodda Nekkundi'], platform: '7', farePerStage: 5 },
+            { id: 'r543', busNumber: '132, 132B', type: 'Ordinary', stops: ['Shivaji Nagar', '100ft Road', 'Domlur Bus Stri'], platform: '7', farePerStage: 5 },
+            { id: 'r544', busNumber: '134A', type: 'Ordinary', stops: ['Shivaji Nagar', '100ft Road', 'CMH Road', 'Halasur', 'Doopanahalli'], platform: '7', farePerStage: 5 },
+            { id: 'r545', busNumber: '314A', type: 'Ordinary', stops: ['Shivaji Nagar', 'DRDO Township 2 Ph'], platform: '7', farePerStage: 5 },
+            { id: 'r546', busNumber: '15K', type: 'Ordinary', stops: ['Shivaji Nagar', 'Kadirenahalli Crs', 'Eliyas Nagar'], platform: '10', farePerStage: 5 },
+            { id: 'r547', busNumber: '29', type: 'Ordinary', stops: ['Shivaji Nagar', 'JPN 15Crs', 'SSMRV', 'Eliyas Nagar'], platform: '11', farePerStage: 5 },
+            { id: 'r548', busNumber: '144A', type: 'Ordinary', stops: ['Shivaji Nagar', 'Neelasandra', 'Philomina', 'Gajendra Nagar'], platform: '17', farePerStage: 5 },
+            { id: 'r549', busNumber: '194', type: 'Ordinary', stops: ['Shivaji Nagar', 'Incometax Layout', 'Gagondanahalli'], platform: '6', farePerStage: 5 },
+            { id: 'r550', busNumber: '339E', type: 'Ordinary', stops: ['Shivaji Nagar', 'Cubbon Road', 'Halasur', 'Gunjuru'], platform: '8', farePerStage: 5 },
+            { id: 'r551', busNumber: '37F', type: 'Ordinary', stops: ['Shivaji Nagar', 'Muneshwara Blk', 'Hanumanth Nagar', 'Giri Nagar'], platform: '10', farePerStage: 5 },
+            { id: 'r552', busNumber: '37E', type: 'Ordinary', stops: ['Shivaji Nagar', 'Muneshwara Blk', 'Hanumanth Nagar', 'Giri Nagar'], platform: '10', farePerStage: 5 },
+            { id: 'r553', busNumber: '63B', type: 'Ordinary', stops: ['Shivaji Nagar', 'Vijaya Nagar', 'RNR 6 Blk', 'GKW Layout'], platform: '6', farePerStage: 5 },
+            { id: 'r554', busNumber: '291G', type: 'Ordinary', stops: ['Shivaji Nagar', 'Cant Rly Station', 'Govinda Pura'], platform: '13', farePerStage: 5 },
+            { id: 'r555', busNumber: '79A', type: 'Ordinary', stops: ['Shivaji Nagar', 'GKW', 'Govt Soap Factory'], platform: '4', farePerStage: 5 },
+            { id: 'r556', busNumber: '341G', type: 'Ordinary', stops: ['Shivaji Nagar', 'KG Road', 'Lalbagh Road', 'Haralur'], platform: '12', farePerStage: 6 },
+            { id: 'r557', busNumber: '320F', type: 'Ordinary', stops: ['Shivaji Nagar', 'GPO', 'Cubbon Road', 'Halasur', 'Harohalli'], platform: '8', farePerStage: 5 },
+            { id: 'r558', busNumber: '415C', type: 'Ordinary', stops: ['Shivaji Nagar', 'Cant Rly Station', 'HBR 2 Stg'], platform: '1', farePerStage: 5 },
+            { id: 'r559', busNumber: '296Q', type: 'Ordinary', stops: ['Shivaji Nagar', 'Cant Rly Station', 'HBR Layout 1Blk'], platform: '9', farePerStage: 5 },
+            { id: 'r560', busNumber: '296D', type: 'Ordinary', stops: ['Shivaji Nagar', 'Cant Rly Station', 'Bamboo Bazar', 'Hennur Crs'], platform: '9', farePerStage: 5 },
+            { id: 'r561', busNumber: '407A', type: 'Ordinary', stops: ['Shivaji Nagar', 'Cant Rly Station', 'Jayamahal Road', 'Hesaraghatta'], platform: '2', farePerStage: 5 },
+            { id: 'r562', busNumber: '190L', type: 'Ordinary', stops: ['Shivaji Nagar', 'HBR 1 Stg', 'Hilal Nagar'], platform: '13', farePerStage: 5 },
+            { id: 'r563', busNumber: '13J', type: 'Ordinary', stops: ['Shivaji Nagar', 'ORR', 'Kadirenahalli Crs', 'Hosakerehalli'], platform: '12', farePerStage: 5 },
+            { id: 'r564', busNumber: '34', type: 'Ordinary', stops: ['Shivaji Nagar', 'Sita Circle', 'Hanumanth Nagar', 'Hosakerehalli'], platform: '10', farePerStage: 5 },
+            { id: 'r565', busNumber: '13J', type: 'Ordinary', stops: ['Shivaji Nagar', 'ORR', 'Kadirenahalli Crs', 'Hosakerehalli'], platform: '12', farePerStage: 5 },
+            { id: 'r566', busNumber: '301D', type: 'Ordinary', stops: ['Shivaji Nagar', 'Cant Rly Station', 'Bamboo Bazar', 'Hosakote'], platform: '14', farePerStage: 5 },
+            { id: 'r567', busNumber: '317G', type: 'Ordinary', stops: ['Shivaji Nagar', 'GPO', 'Cubbon Road', 'Halasur', 'Hosakote'], platform: '8', farePerStage: 5 },
+            { id: 'r568', busNumber: '331M', type: 'Ordinary', stops: ['Shivaji Nagar', 'GPO', 'Cubbon Road', 'Trinity Church', 'Hosakote'], platform: '7', farePerStage: 5 },
+            { id: 'r569', busNumber: '311H', type: 'Ordinary', stops: ['Shivaji Nagar', 'GPO', 'Cubbon Road', 'Halasur', 'Hoysala Nagar'], platform: '8', farePerStage: 5 },
+            { id: 'r570', busNumber: '349K', type: 'Ordinary', stops: ['Shivaji Nagar', 'SBI', 'Richmond Road', 'KH Road', 'Wilson Garden', 'Huskur'], platform: '12', farePerStage: 6 },
+            { id: 'r571', busNumber: '320', type: 'Ordinary', stops: ['Shivaji Nagar', 'GPO', 'Cubbon Road', 'Halasur', 'Immadihalli'], platform: '8', farePerStage: 5 },
+            { id: 'r572', busNumber: '253C', type: 'Ordinary', stops: ['Shivaji Nagar', 'Cant Rly Station', 'Indo Danish Farm'], platform: '3', farePerStage: 5 },
+            { id: 'r573', busNumber: '210G', type: 'Ordinary', stops: ['Shivaji Nagar', 'KS Layout', 'Kadirenahalli Crs', 'Kaveri Nagar', 'ISRO Layout'], platform: '12', farePerStage: 5 },
+            { id: 'r574', busNumber: '155', type: 'Ordinary', stops: ['Shivaji Nagar', 'JJ Nagar', 'Royan Circle', 'Jagajeevanram Nagar'], platform: '15', farePerStage: 5 },
+            { id: 'r575', busNumber: '161B', type: 'Ordinary', stops: ['Shivaji Nagar', 'Tavarekere', 'Dairy Circle', 'Wilson Garden', 'Jaibhima Nagar'], platform: '11', farePerStage: 5 },
+            { id: 'r576', busNumber: '270C', type: 'Ordinary', stops: ['Shivaji Nagar', 'Cant Rly Station', 'Jayamahal Road', 'CV Raman Road', 'Jalahalli'], platform: '3', farePerStage: 5 },
+            { id: 'r577', busNumber: '270A', type: 'Ordinary', stops: ['Shivaji Nagar', 'Cant Rly Station', 'Jayamahal Road', 'Jalahalli Crs'], platform: '3', farePerStage: 5 },
+            { id: 'r578', busNumber: '259', type: 'Ordinary', stops: ['Shivaji Nagar', '7 Camp Rly Station', 'Jalahalli East'], platform: '3', farePerStage: 5 },
+            { id: 'r579', busNumber: '245N, 245P', type: 'Ordinary', stops: ['Shivaji Nagar', 'GPO', 'KG Road', 'Janapriya Town Ship'], platform: '6', farePerStage: 5 },
+            { id: 'r580', busNumber: '20', type: 'Ordinary', stops: ['Shivaji Nagar', '18 Mn', 'JNR 3 Blk', 'Lalbagh', 'Jaya Nagar 9 Blk'], platform: '11', farePerStage: 5 },
+            { id: 'r581', busNumber: '127', type: 'Ordinary', stops: ['Shivaji Nagar', 'Coles Park', 'Lavanya', 'Jeevanahalli'], platform: '17', farePerStage: 5 },
+            { id: 'r582', busNumber: '139', type: 'Ordinary', stops: ['Shivaji Nagar', 'CMH Road', 'Halasur', 'Jeevanbhima Nagar'], platform: '7', farePerStage: 5 },
+            { id: 'r583', busNumber: '13G', type: 'Ordinary', stops: ['Shivaji Nagar', 'Kadirenahalli Crs', 'JHCCS Layout'], platform: '12', farePerStage: 5 },
+            { id: 'r584', busNumber: '368C', type: 'Ordinary', stops: ['Shivaji Nagar', 'SBI', 'Richmond Road', 'KH Road', 'Wilson Garden', 'Jigani'], platform: '12', farePerStage: 6 },
+            { id: 'r585', busNumber: '302G', type: 'Ordinary', stops: ['Shivaji Nagar', 'Jn of Horamavu Road'], platform: '14', farePerStage: 5 },
+            { id: 'r586', busNumber: '29A', type: 'Ordinary', stops: ['Shivaji Nagar', 'Oxford School', 'SSMRV', 'Tel Exchg', 'JP Nagar 1Ph'], platform: '11', farePerStage: 5 },
+            { id: 'r587', busNumber: '27E', type: 'Ordinary', stops: ['Shivaji Nagar', 'JPN 15Crs', 'Water Tank', 'JP Nagar 3Ph'], platform: '11', farePerStage: 5 },
+            { id: 'r588', busNumber: '29', type: 'Ordinary', stops: ['Shivaji Nagar', 'JPN 15Crs', 'SSMRV', 'Tel Exchg', 'JP Nagar 6Ph'], platform: '11', farePerStage: 5 },
+            { id: 'r589', busNumber: '13D', type: 'Ordinary', stops: ['Shivaji Nagar', 'Kaveri Nagar', 'Tel Ex', 'Kadirenahalli Park'], platform: '12', farePerStage: 5 },
+            { id: 'r590', busNumber: '331', type: 'Ordinary', stops: ['Shivaji Nagar', 'GPO', 'Cubbon Road', 'Trinity Church', 'Kadugodi'], platform: '7', farePerStage: 5 },
+            { id: 'r591', busNumber: '291C', type: 'Ordinary', stops: ['Shivaji Nagar', 'Kadugondanahalli PolStation'], platform: '13', farePerStage: 5 },
+            { id: 'r592', busNumber: '303C', type: 'Ordinary', stops: ['Shivaji Nagar', 'Rly Station', 'Bamboo Bazar', 'Kalyana Nagar'], platform: '14', farePerStage: 5 },
+            { id: 'r593', busNumber: '95', type: 'Ordinary', stops: ['Shivaji Nagar', 'BEML Layout', 'Water Tank', 'Kalyana Nagar'], platform: '4', farePerStage: 5 },
+            { id: 'r594', busNumber: '302', type: 'Ordinary', stops: ['Shivaji Nagar', 'Cant Rly Station', 'Bamboo Bazar', 'Kammanahalli'], platform: '14', farePerStage: 5 },
+            { id: 'r595', busNumber: '296E', type: 'Ordinary', stops: ['Shivaji Nagar', 'Cant Rly Station', 'Kammanahalli Ext'], platform: '9', farePerStage: 5 },
+            { id: 'r596', busNumber: '252K', type: 'Ordinary', stops: ['Shivaji Nagar', 'Cant Rly Station', 'Kareemsab Palya'], platform: '3', farePerStage: 5 },
+            { id: 'r597', busNumber: '300J, 300L', type: 'Ordinary', stops: ['Shivaji Nagar', 'Cant Rly Station', 'Bamboo Bazar', 'Kasturi Nagar'], platform: '14', farePerStage: 5 },
+            { id: 'r598', busNumber: '305K', type: 'Ordinary', stops: ['Shivaji Nagar', 'GPO', 'Cubbon Road', 'Halasur', 'Kattigenahalli'], platform: '8', farePerStage: 5 },
+            { id: 'r599', busNumber: '112, 112A', type: 'Ordinary', stops: ['Shivaji Nagar', 'Ambedkar Colg', 'Dinnur Road', 'KavalByrasandra'], platform: '1', farePerStage: 5 },
+            { id: 'r600', busNumber: '37D', type: 'Ordinary', stops: ['Shivaji Nagar', 'Gavi Temple', 'KH Road', 'Kempegowda Nagar'], platform: '10', farePerStage: 5 },
+            { id: 'r601', busNumber: '222E', type: 'Ordinary', stops: ['Shivaji Nagar', 'GPO', 'Vidhanasoudha', 'Kengeri Sat Town'], platform: '15', farePerStage: 5 },
+            { id: 'r602', busNumber: '66', type: 'Ordinary', stops: ['Shivaji Nagar', 'Magadi Road', 'Central', 'Rc Col', 'KHB Col'], platform: '6', farePerStage: 5 },
+            { id: 'r603', busNumber: '245R', type: 'Ordinary', stops: ['Shivaji Nagar', 'Vidhanasoudha', 'KG Road', 'Magdi Road', 'Kitthanahalli'], platform: '4', farePerStage: 5 },
+            { id: 'r604', busNumber: '312', type: 'Ordinary', stops: ['Shivaji Nagar', 'GPO', 'Cubbon Road', 'Halasur', 'Kittaganur'], platform: '8', farePerStage: 5 },
+            { id: 'r605', busNumber: '288A', type: 'Ordinary', stops: ['Shivaji Nagar', 'Cant Rly Station', 'Jayamahal Road', 'Kodigehalli'], platform: '2', farePerStage: 5 },
+            { id: 'r606', busNumber: '300K', type: 'Ordinary', stops: ['Shivaji Nagar', 'Cant Rly Station', 'Jayamahal Road', 'Kodigehalli'], platform: '14', farePerStage: 5 },
+            { id: 'r607', busNumber: '166', type: 'Ordinary', stops: ['Shivaji Nagar', 'Koramangala BDA Compex', 'Koramangala'], platform: '11', farePerStage: 5 },
+            { id: 'r608', busNumber: '141A', type: 'Ordinary', stops: ['Shivaji Nagar', 'Koramangala Housing Cplx'], platform: '17', farePerStage: 5 },
+            { id: 'r609', busNumber: '141B', type: 'Ordinary', stops: ['Shivaji Nagar', 'Kalyan Mantap', 'Koramangala 8 Blk'], platform: '17', farePerStage: 5 },
+            { id: 'r610', busNumber: '329G', type: 'Ordinary', stops: ['Shivaji Nagar', 'GPO', 'Cubbon Road', 'Halasur', 'Airport Road', 'Kotoor'], platform: '7', farePerStage: 5 },
+            { id: 'r611', busNumber: '300E', type: 'Ordinary', stops: ['Shivaji Nagar', 'Cant Rly Station', 'Bamboo Bazar', 'KR Pura'], platform: '14', farePerStage: 5 },
+            { id: 'r612', busNumber: '311, 311F', type: 'Ordinary', stops: ['Shivaji Nagar', 'GPO', 'Cubbon Road', 'Halasur', 'Old Madras Road', 'KR Pura'], platform: '3', farePerStage: 5 },
+            { id: 'r613', busNumber: '310A', type: 'Ordinary', stops: ['Shivaji Nagar', 'GPO', 'Cubbon Road', 'KR Pura Rly Station'], platform: '8', farePerStage: 5 },
+            { id: 'r614', busNumber: '13A, 13C', type: 'Ordinary', stops: ['Shivaji Nagar', 'Kumaraswamy Layout 2 Stg'], platform: '12', farePerStage: 5 },
+            { id: 'r615', busNumber: '161D', type: 'Ordinary', stops: ['Shivaji Nagar', 'Kuvempu Nagar (BTM Layout)'], platform: '11', farePerStage: 5 },
+            { id: 'r616', busNumber: '164', type: 'Ordinary', stops: ['Shivaji Nagar', 'Kuvempu Nagar (BTM Layout)'], platform: '11', farePerStage: 5 },
+            { id: 'r617', busNumber: '27', type: 'Ordinary', stops: ['Shivaji Nagar', 'Kuvempu Nagar (BTM Layout) South'], platform: '11', farePerStage: 5 },
+            { id: 'r618', busNumber: '129', type: 'Ordinary', stops: ['Shivaji Nagar', 'Kempegowda Bus Station'], platform: '-', farePerStage: 5 },
+            { id: 'r619', busNumber: '251C', type: 'Ordinary', stops: ['Shivaji Nagar', 'Cant Rly Station', 'Jayamahal Road', 'Laggere'], platform: '3', farePerStage: 5 },
+            { id: 'r620', busNumber: '144B', type: 'Ordinary', stops: ['Shivaji Nagar', 'Gajendra Nagar', 'Lakshmanrao Nagar'], platform: '17', farePerStage: 5 },
+            { id: 'r621', busNumber: '272', type: 'Ordinary', stops: ['Shivaji Nagar', 'Cant Rly Station', 'Jayamahal Road', 'Lakshmipura'], platform: '3', farePerStage: 5 },
+            { id: 'r622', busNumber: '330A', type: 'Ordinary', stops: ['Shivaji Nagar', 'GPO', 'Cubbon Road', 'LB Shasthri Nagar'], platform: '7', farePerStage: 5 },
+            { id: 'r623', busNumber: '302M', type: 'Ordinary', stops: ['Shivaji Nagar', 'Lingarajapura KHB Colony'], platform: '14', farePerStage: 5 },
+            { id: 'r624', busNumber: '240A', type: 'Ordinary', stops: ['Shivaji Nagar', 'GPO', 'Vidhanasoudha', 'KG Road', 'Machohalli'], platform: '6', farePerStage: 5 },
+            { id: 'r625', busNumber: '79D', type: 'Ordinary', stops: ['Shivaji Nagar', 'Balaji Temple', 'Mahalakshmi Layout'], platform: '4', farePerStage: 5 },
+            { id: 'r626', busNumber: '305H', type: 'Ordinary', stops: ['Shivaji Nagar', 'GPO', 'Cubbon Road', 'Halasur', 'Makali'], platform: '8', farePerStage: 5 },
+            { id: 'r627', busNumber: '223B', type: 'Ordinary', stops: ['Shivaji Nagar', 'GPO', 'RC Colg', 'Central', 'Mallathahalli'], platform: '4', farePerStage: 5 },
+            { id: 'r628', busNumber: '223M', type: 'Ordinary', stops: ['Shivaji Nagar', 'GPO', 'Kasturba Road', 'NR Road', 'Mallathahalli'], platform: '4', farePerStage: 5 },
+            { id: 'r629', busNumber: '348D', type: 'Ordinary', stops: ['Shivaji Nagar', 'KH Road', 'Wilson Garden', 'Mangammanapalya'], platform: '12', farePerStage: 6 },
+            { id: 'r630', busNumber: '119', type: 'Ordinary', stops: ['Shivaji Nagar', 'Nandidurg Road', 'Marappa Garden'], platform: '9', farePerStage: 5 },
+            { id: 'r631', busNumber: '330', type: 'Ordinary', stops: ['Shivaji Nagar', 'GPO', 'Cubbon Road', 'Trinity', 'Marathahalli'], platform: '7', farePerStage: 5 },
+            { id: 'r632', busNumber: '303F', type: 'Ordinary', stops: ['Shivaji Nagar', 'Cant Rly Station', 'Mariyamma Layout'], platform: '14', farePerStage: 5 },
+            { id: 'r633', busNumber: '121B', type: 'Ordinary', stops: ['Shivaji Nagar', 'Mysore Road Bus Station'], platform: '15', farePerStage: 5 },
+            { id: 'r634', busNumber: '304D', type: 'Ordinary', stops: ['Shivaji Nagar', 'GPO', 'Cubbon Road', 'Medi Mallasandra'], platform: '8', farePerStage: 5 },
+            { id: 'r635', busNumber: '13K', type: 'Ordinary', stops: ['Shivaji Nagar', 'Kadirenahalli Crs', 'Meenaz Nagar'], platform: '12', farePerStage: 5 },
+            { id: 'r636', busNumber: '250N', type: 'Ordinary', stops: ['Shivaji Nagar', 'Cant Rly Station', 'Jayamahal Road', 'MEI Layout'], platform: '3', farePerStage: 5 },
+            { id: 'r637', busNumber: '368E', type: 'Ordinary', stops: ['Shivaji Nagar', 'SBI', 'Mico Shramajivi Col'], platform: '12', farePerStage: 6 },
+            { id: 'r638', busNumber: '94C', type: 'Ordinary', stops: ['Shivaji Nagar', 'Chowdeshwari Nagar', 'Mohankumar Nagar'], platform: '3', farePerStage: 5 },
+            { id: 'r639', busNumber: '272A', type: 'Ordinary', stops: ['Shivaji Nagar', 'Cant Rly Station', 'Millers Road', 'MS Palya'], platform: '3', farePerStage: 5 },
+            { id: 'r640', busNumber: '119C', type: 'Ordinary', stops: ['Shivaji Nagar', 'Cant Rly Station', 'Muddamma Garden'], platform: '9', farePerStage: 5 },
+            { id: 'r641', busNumber: '37A', type: 'Ordinary', stops: ['Shivaji Nagar', 'Muneshwara Blk', 'Muneshwara Nagar'], platform: '10', farePerStage: 5 },
+            { id: 'r642', busNumber: '34C', type: 'Ordinary', stops: ['Shivaji Nagar', 'Disoja Nagar', 'ORR', 'Muneshwara Nagar'], platform: '10', farePerStage: 5 },
+            { id: 'r643', busNumber: '329D', type: 'Ordinary', stops: ['Shivaji Nagar', 'GPO', 'Cubbon Road', 'Trinity', 'Muthasandra'], platform: '7', farePerStage: 5 },
+            { id: 'r644', busNumber: '270E', type: 'Ordinary', stops: ['Shivaji Nagar', 'Cant Rly Station', 'Jayamahal Road', 'Muthyala Nagar'], platform: '10', farePerStage: 5 },
+            { id: 'r645', busNumber: '321E', type: 'Ordinary', stops: ['Shivaji Nagar', 'GPO', 'Cubbon Road', 'Halasur', 'Mutkur'], platform: '8', farePerStage: 5 },
+            { id: 'r646', busNumber: '278', type: 'Ordinary', stops: ['Shivaji Nagar', 'Cant Rly Station', 'Jayamahal', 'Nagashettihalli'], platform: '2', farePerStage: 5 },
+            { id: 'r647', busNumber: '290C', type: 'Ordinary', stops: ['Shivaji Nagar', 'Cant Rly Station', 'Bamboo Bazar', 'Nagawara'], platform: '13', farePerStage: 5 },
+            { id: 'r648', busNumber: '314', type: 'Ordinary', stops: ['Shivaji Nagar', 'NR Road', 'Richmond Road', 'Nagawara Palya'], platform: '7', farePerStage: 5 },
+            { id: 'r649', busNumber: '320E', type: 'Ordinary', stops: ['Shivaji Nagar', 'GPO', 'Cubbon Road', 'Nagondanahalli'], platform: '8', farePerStage: 5 },
+            { id: 'r650', busNumber: '314S', type: 'Ordinary', stops: ['Shivaji Nagar', 'GPO', 'Halasur', 'CMH Road', 'Nalluru Pura'], platform: '7', farePerStage: 5 },
+            { id: 'r651', busNumber: '79E', type: 'Ordinary', stops: ['Shivaji Nagar', 'Balaji Temple', 'RNR 1 Blk', 'Nandini Layout'], platform: '4', farePerStage: 5 },
+            { id: 'r652', busNumber: '94A', type: 'Ordinary', stops: ['Shivaji Nagar', 'ORR', 'Nandini Layout'], platform: '3', farePerStage: 5 },
+            { id: 'r653', busNumber: '368', type: 'Ordinary', stops: ['Shivaji Nagar', 'Cubbon Road', 'Mayohall', 'National Park'], platform: '12', farePerStage: 6 },
+            { id: 'r654', busNumber: '144', type: 'Ordinary', stops: ['Shivaji Nagar', 'Philomina', 'Mayohall', 'Neelasandra'], platform: '17', farePerStage: 5 },
+            { id: 'r655', busNumber: '144E', type: 'Ordinary', stops: ['Shivaji Nagar', 'Rose Garden', 'Neelasandra'], platform: '17', farePerStage: 5 },
+            { id: 'r656', busNumber: '258N', type: 'Ordinary', stops: ['Shivaji Nagar', 'Cant Rly Station', 'Jayamahal Road', 'Nelamangala'], platform: '3', farePerStage: 5 },
+            { id: 'r657', busNumber: '93C', type: 'Ordinary', stops: ['Shivaji Nagar', 'CMSR Nagar', 'NEW BEL Road', 'Nethaji Circle'], platform: '4', farePerStage: 5 },
+            { id: 'r658', busNumber: '32', type: 'Ordinary', stops: ['Shivaji Nagar', 'Nettakallappa Circle', 'NR Colony'], platform: '10', farePerStage: 5 },
+            { id: 'r659', busNumber: '238E', type: 'Ordinary', stops: ['Shivaji Nagar', 'University', 'Nrupathunga Nagar'], platform: '15', farePerStage: 5 },
+            { id: 'r660', busNumber: '123', type: 'Ordinary', stops: ['Shivaji Nagar', 'Byappanahalli', 'Old Byppanahalli'], platform: '14', farePerStage: 5 },
+            { id: 'r661', busNumber: '161C', type: 'Ordinary', stops: ['Shivaji Nagar', 'Old Gurappanapalya'], platform: '11', farePerStage: 5 },
+            { id: 'r662', busNumber: '13B', type: 'Ordinary', stops: ['Shivaji Nagar', 'Kadirenahalli Crs', 'Padmanabhanagar'], platform: '12', farePerStage: 5 },
+            { id: 'r663', busNumber: '182', type: 'Ordinary', stops: ['Shivaji Nagar', 'Mini Zoo', 'BSK Stg', 'Padmanabhanagar'], platform: '11', farePerStage: 5 },
+            { id: 'r664', busNumber: '330P', type: 'Ordinary', stops: ['Shivaji Nagar', 'GPO', 'Cubbon Road', 'Halasur', 'Panathur'], platform: '7', farePerStage: 5 },
+            { id: 'r665', busNumber: '339', type: 'Ordinary', stops: ['Shivaji Nagar', 'Cubbon Road', 'Halasur', 'Panathur'], platform: '8', farePerStage: 5 },
+            { id: 'r666', busNumber: '244G', type: 'Ordinary', stops: ['Shivaji Nagar', 'Magadi Road', 'Papareddy Palya'], platform: '6', farePerStage: 5 },
+            { id: 'r667', busNumber: '340F', type: 'Ordinary', stops: ['Shivaji Nagar', 'GPO', 'SBI', 'Richmond Road', 'Parangi Palya'], platform: '12', farePerStage: 6 },
+            { id: 'r668', busNumber: '278K', type: 'Ordinary', stops: ['Shivaji Nagar', 'Cant Rly Station', 'Patalappa Layout'], platform: '2', farePerStage: 5 },
+            { id: 'r669', busNumber: '252A', type: 'Ordinary', stops: ['Shivaji Nagar', 'Cant Rly Station', 'Peenya 2 Stg'], platform: '3', farePerStage: 5 },
+            { id: 'r670', busNumber: '255K', type: 'Ordinary', stops: ['Shivaji Nagar', 'Cant Rly Station', 'Jayamahal Road', 'Pillahalli'], platform: '3', farePerStage: 5 },
+            { id: 'r671', busNumber: '255M', type: 'Ordinary', stops: ['Shivaji Nagar', 'Cant Rly Station', 'Jayamahal Road', 'Pillahalli'], platform: '3', farePerStage: 5 },
+            { id: 'r672', busNumber: '113', type: 'Ordinary', stops: ['Shivaji Nagar', 'Trinity Road', 'Fraser Town', 'Pillanna Garden'], platform: '1', farePerStage: 5 },
+            { id: 'r673', busNumber: '284B', type: 'Ordinary', stops: ['Shivaji Nagar', 'Cant Rly Station', 'Jayamahal Road', 'Puttenahalli'], platform: '2', farePerStage: 5 },
+            { id: 'r674', busNumber: '290A', type: 'Ordinary', stops: ['Shivaji Nagar', 'Cant Rly Station', 'Bamboo Bazar', 'Rachenahalli'], platform: '13', farePerStage: 5 },
+            { id: 'r675', busNumber: '50', type: 'Ordinary', stops: ['Shivaji Nagar', 'Ram Mandir', 'NR Road', 'Raghavendra Col'], platform: '15', farePerStage: 5 },
+            { id: 'r676', busNumber: '79', type: 'Ordinary', stops: ['Shivaji Nagar', 'RNR 1 Blk', 'Devaiah Park', 'RC Colg', 'Rajaji Nagar'], platform: '4', farePerStage: 5 },
+            { id: 'r677', busNumber: '74', type: 'Ordinary', stops: ['Shivaji Nagar', 'Ram Mandir', 'ESI', 'Rajaji Nagar'], platform: '4', farePerStage: 5 },
+            { id: 'r678', busNumber: '291K', type: 'Ordinary', stops: ['Shivaji Nagar', 'Cant Rly Station', 'Bamboo Bazar', 'Rajanukunte'], platform: '13', farePerStage: 5 },
+            { id: 'r679', busNumber: '404F', type: 'Ordinary', stops: ['Shivaji Nagar', 'Cant Rly Station', 'Ramagondanahalli'], platform: '2', farePerStage: 5 },
+            { id: 'r680', busNumber: '250Q', type: 'Ordinary', stops: ['Shivaji Nagar', 'Cant Rly Station', 'Jayamahal Road', 'Ravindra Nagar'], platform: '3', farePerStage: 5 },
+            { id: 'r681', busNumber: '93B', type: 'Ordinary', stops: ['Shivaji Nagar', 'New BEL Road', 'CV Raman Road', 'RMV 2 Stg'], platform: '4', farePerStage: 5 },
+            { id: 'r682', busNumber: '107C', type: 'Ordinary', stops: ['Shivaji Nagar', 'Cant Rly Station', 'Jayamahal Road', 'Matadahalli', 'RT Nagar'], platform: '1', farePerStage: 5 },
+            { id: 'r683', busNumber: '311A', type: 'Ordinary', stops: ['Shivaji Nagar', 'GPO', 'Cubbon Road', 'Halasur', 'Sadananda Nagar'], platform: '8', farePerStage: 5 },
+            { id: 'r684', busNumber: '100', type: 'Ordinary', stops: ['Shivaji Nagar', 'Bashyam Circle', 'Vasanth Nagar', 'Sadashiva Nagar'], platform: '5', farePerStage: 5 },
+            { id: 'r685', busNumber: '342R', type: 'Ordinary', stops: ['Shivaji Nagar', 'KH Road', 'Wilson Garden', 'Dairy Circle', 'St. Johns', 'Sarjapura'], platform: '12', farePerStage: 6 },
+            { id: 'r686', busNumber: '311J', type: 'Ordinary', stops: ['Shivaji Nagar', 'GPO', 'Richmond Road', 'Mayohall', 'Halasur', 'Seegehalli'], platform: '8', farePerStage: 5 },
+            { id: 'r687', busNumber: '300P', type: 'Ordinary', stops: ['Shivaji Nagar', 'Cant Rly Station', 'Bamboo Bazar', 'Shanthi Layout'], platform: '14', farePerStage: 5 },
+            { id: 'r688', busNumber: '311P', type: 'Ordinary', stops: ['Shivaji Nagar', 'GPO', 'Cubbon Road', 'Halasur', 'Shanthi Layout'], platform: '8', farePerStage: 5 },
+            { id: 'r689', busNumber: '141E', type: 'Ordinary', stops: ['Shivaji Nagar', 'Ejipura', 'Vannarpet', 'Austin Town', 'Shinivagilu'], platform: '17', farePerStage: 5 },
+            { id: 'r690', busNumber: '183, 183A', type: 'Ordinary', stops: ['Shivaji Nagar', 'GPO'], platform: '11', farePerStage: 5 },
+            { id: 'r691', busNumber: '266J', type: 'Ordinary', stops: ['Shivaji Nagar', 'Cant Rly Station', 'Jayamahal Road', 'Siluvepura'], platform: '4', farePerStage: 5 },
+            { id: 'r692', busNumber: '272E', type: 'Ordinary', stops: ['Shivaji Nagar', 'Cant Rly Station', 'Jayamahal Road', 'Tata Inst', 'Singapura'], platform: '3', farePerStage: 5 },
+            { id: 'r693', busNumber: '37', type: 'Ordinary', stops: ['Shivaji Nagar', 'Hanumanth Nagar', 'Sajjanrao Circle', 'Sree Nagar'], platform: '10', farePerStage: 5 },
+            { id: 'r694', busNumber: '114A', type: 'Ordinary', stops: ['Shivaji Nagar', 'Dinnur Road', 'RT Nagar', 'Sultan Palya'], platform: '25', farePerStage: 5 },
+            { id: 'r695', busNumber: '278A', type: 'Ordinary', stops: ['Shivaji Nagar', 'Cant Rly Station', 'Jayamahal Road', 'Tata Nagar'], platform: '2', farePerStage: 5 },
+            { id: 'r696', busNumber: '214A', type: 'Ordinary', stops: ['Shivaji Nagar', 'Cant Rly Station', 'Jayamahal Road', 'Tattaguppe'], platform: '15', farePerStage: 5 },
+            { id: 'r697', busNumber: '290', type: 'Ordinary', stops: ['Shivaji Nagar', 'Cant Rly Station', 'Bamboo Bazar', 'Thanisandra'], platform: '13', farePerStage: 5 },
+            { id: 'r698', busNumber: '32E', type: 'Ordinary', stops: ['Shivaji Nagar', 'Nettakallappa Circle', 'HB Samaja', 'Thyagaraja Nagar'], platform: '10', farePerStage: 5 },
+            { id: 'r699', busNumber: '37B', type: 'Ordinary', stops: ['Shivaji Nagar', 'Muneshwara Blk', 'Timber YaRoad Layout'], platform: '10', farePerStage: 5 },
+            { id: 'r700', busNumber: '121A', type: 'Ordinary', stops: ['Shivaji Nagar', 'Mysore Road', 'Timber YaRoad Layout'], platform: '10', farePerStage: 5 },
+            { id: 'r701', busNumber: '310C', type: 'Ordinary', stops: ['Shivaji Nagar', 'GPO', 'Cubbon Road', 'Halasur', 'Udaya Nagar'], platform: '8', farePerStage: 5 },
+            { id: 'r702', busNumber: '282E', type: 'Ordinary', stops: ['Shivaji Nagar', 'Cant Rly Station', 'Jayamahal Road', 'Bellary Road', 'Uttanahalli'], platform: '2', farePerStage: 5 },
+            { id: 'r703', busNumber: '210F', type: 'Ordinary', stops: ['Shivaji Nagar', 'KH Road', 'Wilson Garden', 'Siddapura', 'Uttarahalli'], platform: '12', farePerStage: 6 },
+            { id: 'r704', busNumber: '210H', type: 'Ordinary', stops: ['Shivaji Nagar', 'Chikalsandra', 'Kadirenahalli', 'Kaveri Nagar', 'Uttarahalli'], platform: '15', farePerStage: 5 },
+            { id: 'r705', busNumber: '330F', type: 'Ordinary', stops: ['Shivaji Nagar', 'GPO', 'Cubbon Road', 'Trinity Church', 'Airport Road', 'Varthur'], platform: '7', farePerStage: 5 },
+            { id: 'r706', busNumber: '210Y', type: 'Ordinary', stops: ['Shivaji Nagar', 'Kanakapura Road', 'Sangam Circle', 'Vasanthapura'], platform: '12', farePerStage: 5 },
+            { id: 'r707', busNumber: '34D', type: 'Ordinary', stops: ['Shivaji Nagar', 'Hoskerehalli Crs', 'Sita Circle', 'Veerabrjadra Nagar'], platform: '9', farePerStage: 5 },
+            { id: 'r708', busNumber: '79G', type: 'Ordinary', stops: ['Shivaji Nagar', 'Sanjaygandhi Nagar', 'Vidhanasoudha Layout'], platform: '4', farePerStage: 5 },
+            { id: 'r709', busNumber: '276A', type: 'Ordinary', stops: ['Shivaji Nagar', 'Cant Rly Station', 'Jayamahal Road', 'Vidyaranyapura'], platform: '3', farePerStage: 5 },
+            { id: 'r710', busNumber: '288E', type: 'Ordinary', stops: ['Shivaji Nagar', 'Cant Rly Station', 'Jayamahal Road', 'Vidyaranyapura'], platform: '2', farePerStage: 5 },
+            { id: 'r711', busNumber: '290G', type: 'Ordinary', stops: ['Shivaji Nagar', 'Cant Rly Station', 'Bamboo Bazar', 'Vidyasagara'], platform: '18', farePerStage: 5 },
+            { id: 'r712', busNumber: '63E', type: 'Ordinary', stops: ['Shivaji Nagar', 'Hampi Nagar', 'Vijaya Nagar', 'Vijaya Nagar East'], platform: '6', farePerStage: 5 },
+            { id: 'r713', busNumber: '64', type: 'Ordinary', stops: ['Shivaji Nagar', 'Vijaya Nagar', 'Ind. Town', 'Vijaya Nagar'], platform: '5', farePerStage: 5 },
+            { id: 'r714', busNumber: '63', type: 'Ordinary', stops: ['Shivaji Nagar', 'Maruthi Mandir', 'Vijaya Nagar'], platform: '6', farePerStage: 5 },
+            { id: 'r715', busNumber: '311C', type: 'Ordinary', stops: ['Shivaji Nagar', 'GPO', 'Cubbon Road', 'Halasur', 'Vijanapura'], platform: '8', farePerStage: 5 },
+            { id: 'r716', busNumber: '154', type: 'Ordinary', stops: ['Shivaji Nagar', 'Royan Circle', 'Ram Mandir', 'NR Road', 'Vinayaka Nagar'], platform: '15', farePerStage: 5 },
+            { id: 'r717', busNumber: '287N', type: 'Ordinary', stops: ['Shivaji Nagar', 'Cant Rly Station', 'Viswanathanagenahalli'], platform: '2', farePerStage: 5 },
+            { id: 'r718', busNumber: '415', type: 'Ordinary', stops: ['Shivaji Nagar', 'Cant Rly Station', 'Viswanathanagenahalli'], platform: '1', farePerStage: 5 },
+            { id: 'r719', busNumber: '141', type: 'Ordinary', stops: ['Shivaji Nagar', 'Vannarpet', 'Austin Town', 'Philomina', 'Viveka Nagar'], platform: '17', farePerStage: 5 },
+            { id: 'r720', busNumber: '34B', type: 'Ordinary', stops: ['Shivaji Nagar', 'Hanumanth Nagar', 'Vivekananda Nagar'], platform: '10', farePerStage: 5 },
+            { id: 'r721', busNumber: '320C', type: 'Ordinary', stops: ['Shivaji Nagar', 'GPO', 'Cubbon Road', 'Halasur', 'Vydehi Hospital'], platform: '8', farePerStage: 5 },
+            { id: 'r722', busNumber: '320H', type: 'Ordinary', stops: ['Shivaji Nagar', 'GPO', 'White Field'], platform: '8', farePerStage: 5 },
+            { id: 'r723', busNumber: '293G', type: 'Ordinary', stops: ['Shivaji Nagar', 'Cant Rly Station', 'Bamboo Bazar', 'Yarappanahalli'], platform: '9', farePerStage: 5 },
+            { id: 'r724', busNumber: '280, 291D', type: 'Ordinary', stops: ['Shivaji Nagar', 'Cant Rly Station', 'Bamboo Bazar', 'Yelahanka'], platform: '2', farePerStage: 5 },
+            { id: 'r725', busNumber: '290E', type: 'Ordinary', stops: ['Shivaji Nagar', 'Cant Rly Station', 'Bamboo Bazar', 'Yelahanka'], platform: '13', farePerStage: 5 },
+            { id: 'r726', busNumber: '296K', type: 'Ordinary', stops: ['Shivaji Nagar', 'Cant Rly Station', 'Yelahanka ST 4 Ph'], platform: '9', farePerStage: 5 },
+            { id: 'r727', busNumber: '404E', type: 'Ordinary', stops: ['Shivaji Nagar', 'Cant Rly Station', 'Yelahanka ST 4 Ph'], platform: '2', farePerStage: 5 },
+            { id: 'r728', busNumber: '92, 94E', type: 'Ordinary', stops: ['Shivaji Nagar', 'Yeshawanthpura Rly Station'], platform: '5', farePerStage: 5 },
+            { id: 'r729', busNumber: '7H', type: 'Ordinary', stops: ['Jayanagar 4th block', 'Wilson garden', 'Austin town', 'Viveknagar', 'NGV', 'Koramangala water Tank', 'BTM'], platform: '-', farePerStage: 5 },
+            { id: 'r730', busNumber: '201MA', type: 'Ordinary', stops: ['St. Johns', 'Koramangala water tank', 'DELL', 'Indiranagar 100 ft road', 'Jeevanbhimanagar'], platform: '-', farePerStage: 5 },
+            { id: 'r731', busNumber: '201RC', type: 'Ordinary', stops: ['Chikkalasandra', 'Banashankari', 'Silk board', 'Dell', 'Indiranagar 100ft road', 'C.V.Raman nagar'], platform: '-', farePerStage: 5 },
+            { id: 'r732', busNumber: '201S', type: 'Ordinary', stops: ['Banashankari', 'BTM', 'Silk board', 'Forum', 'Ulsoor', 'Indiranagar', 'Domlur'], platform: '-', farePerStage: 5 },
+            { id: 'r733', busNumber: '201U', type: 'Ordinary', stops: ['AGS Layout', 'Banashankari', 'BTM', 'Silk board', 'DELL', 'Indiranagar 100ft road', 'Byappanhalli'], platform: '-', farePerStage: 5 },
+            { id: 'r734', busNumber: '201V', type: 'Ordinary', stops: ['Jayanagar 4th block', 'BTM', 'Silk board', 'Koramangala', 'Neelasandra'], platform: '-', farePerStage: 5 },
+            { id: 'r735', busNumber: '373G', type: 'Ordinary', stops: ['Srinagar', 'Hanumanthanagar', 'Basavanagudi', 'Jayanagar', 'BTM', 'Silk board', 'Electronic City'], platform: '-', farePerStage: 5 },
+            { id: 'r736', busNumber: '375B', type: 'Ordinary', stops: ['Kengeri Shirke', 'Kengeri', 'Uttarahalli', 'Chikkalasandra', 'Banashankari', 'Jayanagar 4th block', 'Shantinagar bus stand'], platform: '-', farePerStage: 5 },
+            { id: 'r737', busNumber: 'BIAS-8A', type: 'AC Vajra', stops: ['BTM', 'Silk board', 'Agara', 'Marathahalli', 'K.R.Puram', 'Hebbal', 'Airport'], platform: '-', farePerStage: 10 },
+            { id: 'r738', busNumber: '378', type: 'Ordinary', stops: ['Kengeri Shirke', 'Kengeri', 'Uttarahalli', 'Chikkalsandra', 'Konanakunte cross', 'Gottigere', 'WIPRO', 'Electronic city gate'], platform: '-', farePerStage: 5 },
+            { id: 'r739', busNumber: '410D', type: 'Ordinary', stops: ['Bharath nagar', 'Sunkadagatte', 'K.H.B.Colony magadi road', 'Vijayanagar', 'Hosakerahalli', 'Banashankari', 'BTM', 'Silk board', 'Electronic City'], platform: '-', farePerStage: 5 },
+            { id: 'r740', busNumber: '500NC', type: 'Ordinary', stops: ['Banashankari', 'East end', 'Dairy circle', 'Agara', 'Marathahalli', 'ITPL'], platform: '-', farePerStage: 5 },
+            { id: 'r741', busNumber: '600G', type: 'Ordinary', stops: ['Chandapura', 'Electronic city', 'Silk board', 'BTM', 'Banashankari', 'Kumaraswamy layout second stage'], platform: '-', farePerStage: 5 },
+            { id: 'r742', busNumber: '600FA', type: 'Ordinary', stops: ['Banashankari', 'BTM', 'Silk board', 'Bommanhalli', 'Electronic city', 'Jigani'], platform: '-', farePerStage: 5 },
+            { id: 'r743', busNumber: '600Q', type: 'AC Vajra', stops: ['Banashankari', 'Jayanagar 4th block', 'BTM', 'Silk board', 'Electronic city'], platform: '-', farePerStage: 10 },
+            { id: 'r744', busNumber: '276Q, 276R', type: 'Ordinary', stops: ['Vidyaranyapura', 'Nanjappa circle', 'Thindlu', 'Kodigehalli', 'Hebbal', 'BEL circle', 'Vidyaranyapura'], platform: '-', farePerStage: 5 },
+            { id: 'r745', busNumber: '276M', type: 'Ordinary', stops: ['Nanjappa circle', 'New BEL Road', 'Anand Rao Circle', 'Shantinagar'], platform: '-', farePerStage: 5 },
+            { id: 'r746', busNumber: '288M', type: 'Ordinary', stops: ['Kodigehalli', 'Majestic'], platform: '-', farePerStage: 5 },
+            { id: 'r747', busNumber: '364K', type: 'Ordinary', stops: ['K.R.Market', 'East End', 'Delmia', 'Brigade millenium'], platform: '-', farePerStage: 5 },
+            { id: 'r748', busNumber: '401H', type: 'Ordinary', stops: ['Yelahanka', 'Kodigehalli gate', 'Kodigehalli', 'Tindlu', 'BEL circle', 'Yeshvantapur', 'Hampi nagar'], platform: '-', farePerStage: 5 },
+            { id: 'r749', busNumber: '366MA', type: 'Ordinary', stops: ['Byatarayanadoddi', 'Weavers colony', 'Gottigere', 'J.P.Nagar 3rd phase', 'East end', 'Jayanagar 4th block', 'K.R.Market'], platform: '-', farePerStage: 5 },
+            { id: 'r750', busNumber: 'AS-15', type: 'Ordinary', stops: ['Byatarayanadoddi', 'Jayanagar 4th block'], platform: '-', farePerStage: 5 },
+            { id: 'r751', busNumber: '373GR', type: 'Ordinary', stops: ['Rajarajeshwari nagar', 'Nayandahalli', 'Electronic city'], platform: '-', farePerStage: 5 },
+            { id: 'r752', busNumber: '250ZA', type: 'Ordinary', stops: ['Majestic', 'Yeshvantapur', 'Jalahalli cross', 'Adarsha college'], platform: '-', farePerStage: 5 },
+            { id: 'r753', busNumber: '500KG', type: 'Ordinary', stops: ['Global Village', 'R.V.college', 'Banashankari', 'Marathahalli', 'ITPL'], platform: '-', farePerStage: 5 },
+            { id: 'r754', busNumber: '600KG', type: 'Ordinary', stops: ['Global village', 'Electronic city'], platform: '-', farePerStage: 5 },
+            { id: 'r755', busNumber: '270HA', type: 'Ordinary', stops: ['Jayanagar 9th block', 'Shivajinagar', 'HMT'], platform: '-', farePerStage: 5 },
+            { id: 'r756', busNumber: 'WFS', type: 'Ordinary', stops: ['Marathahalli', 'Kundalahalli', 'Brookfields', 'Hope Farm', 'Varthur kodi', 'Marathahalli'], platform: '-', farePerStage: 5 },
+            { id: 'r757', busNumber: 'FDR-6', type: 'Ordinary', stops: ['Chikkalasandra', 'Konanakunte cross', 'Jambu savari Dinne', 'Kothnur dinne', 'J.P.Nagar 15th cross', 'Jayanagar 4th block', 'Banashankari', 'Chikkalasandra'], platform: '-', farePerStage: 5 },
+            { id: 'r758', busNumber: '314AA', type: 'Ordinary', stops: ['Ulsoor', 'BTP', 'Malelshpalya', 'Marathahalli', 'Kundalahalli Gate', 'ITPL'], platform: '-', farePerStage: 5 },
+            { id: 'r759', busNumber: '401GA', type: 'Ordinary', stops: ['Yelahanka Satellite Town', 'Yeshvantapur', 'Vijayanagar', 'Nayandahalli', 'Chennamakere Achukattu'], platform: '-', farePerStage: 5 },
+            { id: 'r760', busNumber: '600FB', type: 'Ordinary', stops: ['AGS layout', 'Banashankari', 'Electronic city'], platform: '-', farePerStage: 5 },
+            { id: 'r761', busNumber: '401AC', type: 'AC Vajra', stops: ['Devanahalli', 'Yelahanka', 'Yeshvantapur'], platform: '-', farePerStage: 10 },
+            { id: 'r762', busNumber: '215BM', type: 'Ordinary', stops: ['Brigade Millenium', 'Majestic'], platform: '-', farePerStage: 5 },
+            { id: 'r763', busNumber: '215L', type: 'Ordinary', stops: ['Kothnur', 'Banashankari', 'Jayanagar', 'Jeevanbhimanagar'], platform: '-', farePerStage: 5 },
+            { id: 'r764', busNumber: '13Z', type: 'Ordinary', stops: ['ISRO layout', 'Shivajinagar'], platform: '-', farePerStage: 5 },
+            { id: 'r765', busNumber: '210PS', type: 'Ordinary', stops: ['Chikkalasandra', 'NR Colony', 'Gandhi Bazaar', 'Chamarajpet', 'Good shed road', 'Majestic'], platform: '-', farePerStage: 5 },
+            { id: 'r766', busNumber: '414', type: 'Ordinary', stops: ['K. Narayanapura', 'Hampi nagar'], platform: '-', farePerStage: 5 },
+            { id: 'r767', busNumber: '180C', type: 'Ordinary', stops: ['KHB Colony (Magadi road)', 'Yeshvantapur'], platform: '-', farePerStage: 5 },
+            { id: 'r768', busNumber: '500AG', type: 'Ordinary', stops: ['Global village', 'Banashankari', 'Hebbal'], platform: '-', farePerStage: 5 },
+            { id: 'r769', busNumber: '500KG', type: 'Ordinary', stops: ['Global village', 'Marathahalli'], platform: '-', farePerStage: 5 },
+            { id: 'r770', busNumber: '356Z', type: 'Ordinary', stops: ['Chandapura', 'Anekal'], platform: '-', farePerStage: 5 },
+            { id: 'r771', busNumber: '351R', type: 'Ordinary', stops: ['Anekal', 'Sarjapura'], platform: '-', farePerStage: 5 },
+            { id: 'r772', busNumber: '279H', type: 'Ordinary', stops: ['Majestic', 'Malleshwaram', 'Sadhhashivanagar police station', 'Ramaiah Hospital', 'Ashwath nagar', 'Sanjay nagar', 'Nagashettyhalli'], platform: '-', farePerStage: 5 },
+            { id: 'r773', busNumber: '284H', type: 'Ordinary', stops: ['Majestic', 'Malleshwaram', 'Ramiah Hospital', 'Bhadrappa layout', 'Byataranyapura', 'NES', 'Yelahanka New Town'], platform: '-', farePerStage: 5 },
+            { id: 'r774', busNumber: 'G-12', type: 'Ordinary', stops: ['Old Madras road', 'K.R.Puram', 'Trinity circle', 'Shantinagar TTMC'], platform: '-', farePerStage: 5 },
+            { id: 'r775', busNumber: '500DE', type: 'Ordinary', stops: ['Vidyaranyapura', 'Hebbal', 'Marathahalli', 'Hope farm'], platform: '-', farePerStage: 5 },
+            { id: 'r776', busNumber: '315G', type: 'Ordinary', stops: ['Krishnarajapuram', 'Banashankari'], platform: '-', farePerStage: 5 },
+            { id: 'r777', busNumber: '500E', type: 'AC Vajra', stops: ['Hebbal', 'Electronic City'], platform: '-', farePerStage: 10 },
+            { id: 'r778', busNumber: '500F', type: 'Ordinary', stops: ['Kadugodi', 'Silk Board', 'Banashankari', 'Uttarahalli', 'Kengeri'], platform: '-', farePerStage: 5 },
+            { id: 'r779', busNumber: '507', type: 'Ordinary', stops: ['K.R.Puram', 'Hebbal', 'BEL Circle', 'Yeshvantapur', 'Gorguntepalya', 'Kamakshipalya', 'Sunkadagatte'], platform: '-', farePerStage: 5 }
+        ],
+        stops: [
+            "A Narayanapura", "Abbigere", "Adarsha college", "Adigondanahalli", "Adugodi", "Adugodi Police Quarters", "AECS Dental Colgs", "AECS Layout", "AGS Layout", "Agara", "Agrahara Layout", "Airport", "Akshayanagara", "Amarjyothi Nagar", "Ambedkar Colg", "Ambedkar Nagar", "Ananda Nagar", "Anantha Nagar", "Ananthapura", "Anchepalya", "Andrahalli", "Anekal", "Anjanapura", "Annapoorneshwari Nagar", "Arabic Colg", "Arekere", "Ashwath nagar", "Attibele", "Attur", "Austin town", "Avalahalli", "Averahalli", "Ayyappa Nagar", "B Channasandra", "BNagasandra", "Babasab Palya", "Bagalagunte", "Bagur", "Balaji Nagar", "Banasawadi", "Banashankari", "Banashankari 2 Stg", "Banashankari 3 Stg 2Ph", "Banashankari Bus Station", "Bandi Reddy Circle", "Bang Childrens Hospital", "Bangarappa Nagar", "Bannerghatta National Park", "Bapuji Nagar", "Basapura", "Basava Nagar", "Basavanagudi", "Basaveshwara Nagar", "BEL Circle", "Begur", "Bellandur", "Bellikere", "BEML 5Ph", "BEML 5Stg", "Bendre Nagar", "Bendiganahalli", "Bharath Nagar 2nd 2", "Bharath nagar", "Bhadrappa layout", "Bhimjyothi Nagar", "Bhpopasandra", "Bhuvaneswari Nagar", "Bidadi", "Bikasipura", "Bilavaradahalli", "Bilesevale", "Bommanahalli", "Bommasandra", "Bonmill", "Boodigere", "Boopasandra", "Brigade Millenium", "Brindavanagagar", "Brookfields", "Brundavan Nagar", "BTM", "Byadarahalli", "Byalahalli", "Byappanahalli", "Byappanhalli", "Byataranyapura", "Byatarayanadoddi", "Byrasandra", "C.V.Raman nagar", "Cant Rly Station", "Central", "Central Jail", "Chamarajpet", "Chamundi Nagar", "Chandapura", "Chandra Layout", "Chandra Layout 1 Stg", "Chandra Nagar", "Channasandra", "Cheemasadra", "Chelakere Extension", "Chenammanakere Acuat", "Chennannanakare Achukattu", "Chettekere Palya", "Chikka Banavara", "Chikka Bommasandra", "Chikka Kammanahalli", "Chikkabanavara", "Chikkakammanahalli", "Chikkalasandra", "Chikkalsandra", "Chinnappa GaRoaden", "Chinnappanahalli", "Chola Nayakanahalli", "Chowdeshwari Nagar", "Chowdeshwari Bus Station", "Coffee BoaRoad", "Coles Park", "Corporation", "Cox Town", "Dairy Circle", "Dasarahalli", "Dasanayakanahalli", "DELL", "Delmia", "Devanahalli", "Devanagundi", "Devara Chikkanahalli", "Devarabisanahalli", "Devasandra", "Dinnur Road", "Dodda Basthi", "DoddaBidarakal", "Dodda Gubbi", "Dodda Kannelli", "Dodda Nekkundi", "Dodda Toogur", "Doddaballapura", "Domlur", "Domlur Bus Stri", "Dommasandra", "Doopanahalli", "DRDO Township", "East end", "Electronic City", "Electronic city", "Electronic city gate", "Eliyas Nagar", "Eshwara Layout", "Ejipura", "Forum", "Freedom Fighters Col", "Gajendra-Nagar", "Gandhi Bazaar", "Gandhi Pura", "Ganga Nagar", "Gangondanahalli", "Garudachar Palya", "GeleyaraBalaga", "Gidadakonahall", "Giddenahalli", "Giri Nagar", "Giri Nagar 2 Stg", "Giri Nagar Circle", "Global Village", "GKVK", "GKW Layout", "Gollarahatti", "Good shed road", "Goraguntepalya", "Gorguntepalya", "Gottigere", "Govt Press", "Govt Soap Factory", "GPO", "Gunjur", "Gunjuru", "HBR 1 Stg", "HBR 2 Stg", "HBR Layout 1Blk", "HMT", "HSR BDA Complex", "HSR Layout", "HSR 2 Sec", "Halasur", "Hammadevanahalli", "Hampi nagar", "Hampapura", "Handenahalli", "Hanumanth Nagar", "Hanumanthanagar", "Haragadde", "Haralur", "Harohalli", "Hebbal", "Hebbagodi", "Heelalige", "HenNagara", "Hennur Crs", "Hesaraghatta", "Hesaraghatta Vinayaka Nagar", "Hilal Nagar", "Hoodi", "Hope Farm", "Horamavu Road", "Hosakerehalli", "Hosakerehaili", "Hosakote", "Hosapalya", "Hosa Road", "Hosur", "Hoysala Nagar", "Hulimangala", "Hulimavu", "Hullahalli", "Hunasemarada Palya", "Huskur", "IAF Chinmai Hills", "Iblur", "ITPL", "Indiranagar", "Indiranagar 100 ft road", "Indira Nagar ESI", "Indo Danish Farm", "ISKON", "ISRO Layout", "ISRO Quarters", "ITI Colony", "ITI Layout", "Ittamadu", "Jagadeesh Nagar", "Jagajeevanram Nagar", "Jai Bhuvneswari Nagar", "Jai Maruthi Nagar", "Jaibhima Nagar", "Jalahalli", "Jalahalli Crs", "Jalahalli Cross", "Jalahalli East", "Jambu savari Dinne", "Jambusavari Dinne", "Janapriya Town Ship", "Jangamakote", "Jayanagar", "Jayanagar 4th block", "Jayanagar 9 Blk", "Jayanagar 9th block", "Jayadeva Hospital", "Jayanthi Nagar", "Jeevanahalli", "Jeevanbhimanagar", "JHBCS Layout", "Jigala", "Jigani", "Jnanabharathi", "Jodi Thimmasandra", "JP Nagar 1 Ph", "JP Nagar 3 Ph", "JP Nagar 5 Ph", "JP Nagar 6 Ph", "Judical Layout", "Jyothi Nagar", "K.H.B.Colony magadi road", "K. Narayanapura", "K.R.Market", "K.R.Puram", "KR Market", "Kaduagrahara", "Kadabagere", "Kadirenahalli Park", "Kadugodi", "Kaggalipura", "Kalidas Layout", "Kalkere", "Kalyana Nagar", "Kamakshi Layout", "Kamakshipalya", "Kamala Nagar", "Kamalanagar BEML Layout", "Kambali Pura", "Kambipura", "Kammanahalli", "Kammasandra", "Kanakapura Road", "Kanasawadi", "Kannamangala", "Karishma Hills", "Kattu Gollahalli", "Kaval Byrasandra", "Kaveri Nagar", "Kempapura", "Kempegowda Bus Station", "Kempegowda Nagar", "Kenchanapura", "Kenchenahalli", "Kendrya Sadana", "Kengeri", "Kengeri KHB Qtrs.", "Kengeri Sattelite Town", "Kengeri Shirke", "Khaji Hosahalli", "KHB Colony", "KHBQuarters", "Kittaganur", "Kittanahalli", "Kodigehalli", "Kodigehalli gate", "Kodihalli", "Koli farm", "Kolathur", "Konanakunte", "Konanakunte cross", "Konappana Agrahara", "Koppa", "Koramangala", "Koramangala water tank", "Koraluru", "Kothanoor", "Kothnur dinne", "Kotoor", "Krishnarajapuram", "Kudlu Gate", "Kumarabeedu", "Kumaraswamy layout second stage", "Kumaraswamy Layout", "Kumaraswamya Layout", "Kumaraswamya Layout 2nd St.", "Kumbalagodu", "Kundalahalli", "Kundalahalli Gate", "Kubarahalli", "Kuvempu Nagar", "Kuvempu Kagar (BTM Layout)", "Laggere", "Lakshmanrao Nagar", "Lakshmidevi Nagar", "Lakshminarayanapura", "Lalbagh", "LB Shasthri Nagar", "Leglislators Home", "Lingarajapura", "Lottegollahali", "LR Bande", "M Karena halli", "M Madivala", "Machohalli", "Madiwala", "Magadi Road", "Mahalakshmi Layout", "Majestic", "Makali", "Malgala", "Malelshpalya", "Malleshwaram", "Mallathahalli", "Mandoor", "Mangammana Palya", "Manjunatha Nagar", "Mararandra", "Marasoor", "Marathahalli", "Marathahalli Bridge", "Marenahalli", "Mariyamma Layout", "Mariyarnma Layout", "Maruthi Mandir", "MCTC", "Medarahalli", "Meenaz Nagar", "Meetaganahalli", "MEI Layout", "Mekhri Circle", "Mestri Palya", "Mico Shramajivi Col", "Mohankumar Nagar", "Mphankumar Nagar", "MS Palya", "Muddamma Garden", "Mune Kolalu", "Muneshwara Blk", "Muneshwara Nagar", "Muniswamappa Layout", "Muthasandra", "Muthyala Nagar", "Mutkur", "Mysore Bank Col.", "Mysore Road", "Mysore Road Satellite Bus Station", "Nagadevanahalli", "Nagrabhavi", "Nagrabhavi 10Blk", "Nagrabhavi 5 Blk", "Nagashettihalli", "Nagashettyhalli", "Nagawara", "Nagawara Palya", "Nagenahalli", "Nagondanahalli", "Naidu Layout", "Nandini Layout", "Nanjappa circle", "Narayana Ghatta", "National Park", "Nayandahalli", "Neelasandra", "Neeladri amusement park", "Nelamangala", "Nellurhalli", "NES", "Nethaji Cir", "New BEL Road", "NGV", "Nimhans", "NR Colony", "Nrupathunga Nagar", "Nyanappanahalli", "Old Byppanahalli", "Old Gurappanapalya", "Old Madras road", "ORR", "Oxford School", "Padmanabhanagar", "Panathur", "Papareddy Palya", "Parappana Agrahara", "Patelappa Layout", "Pattabhinagar", "Pattandur Agrahara", "Peenya", "Peenya 2 Stg", "PES", "Pichaguntarahalli", "Pillahalli", "Pillanna Garden", "Prakash Nagar", "Pujena Agrahara", "Puttenahalli", "R.V.college", "Rachenahalli", "Raghavendra Col", "Rajaji Nagar", "Rajaji Nagar 1 Blk", "Rajarajeshwari nagar", "Rajani Farm", "Rajanukunte", "Rajivgandhi Nagar", "Rajmahal Vilas 2 Stg", "Ramachandrapura", "Ramagondanahalli", "Ramamurthy Nagar", "Ramanayakana Doddi", "Ramasandra", "Rampura", "Ramakrishanapura", "Ravindra Nagar", "Rayasandra", "RK Hegde Nagar", "RMV 2 Stg", "RT Nagar", "Sadananda Nagar", "Sadashiva Nagar", "Sadhhashivanagar police station", "Sahakara Nagar", "Sakalwara", "Sangam Circle", "Sanjay nagar", "Sanjaygandhi Nagar", "Sarswathi Nagar", "Sarjapur", "Seegehalli", "Seetharam Palya", "Shakthi Resorts", "Shankar Nagar", "Shankar Nagar BusStation", "Shanthi Layout", "Shantinagar", "Shantinagar bus stand", "Shanthiniketan Layout", "Shanubhoghanahalli", "Shinivagilu", "Shivajinagar", "Siluvepura", "Singapura", "Singasandra", "Somanahalli", "Somashettahalli", "Somasundara Palya", "Sondekoppa", "Soukya Hospital", "South End Circle", "Sports Authority of India", "Sree Nagar", "Sreenivagilu", "Sri Ram Nagar", "Sri Sathya Sai Hospital", "Srigandada Kaval", "Srinagar", "Srinivasa Nagar", "Srirampura", "St. Johns", "Suddaguntepalya", "Sujatha", "Sulebele", "Sulikere", "Sultan Palya", "Sunkada Katte", "Sunkadagatte", "Swathanthra Yodhara Nagar", "Tavarekere", "Tata Inst", "Tata Nagar", "Tattanahalli", "Teachers Col", "Telecom Layout", "ThambuchettyPalya", "Thammenahalli", "Thanisandra", "Thimmsandra", "Thindlu", "Thota Guddada Haiti", "Thyagaraja Nagar", "Tigalarapalya", "Timber YaRoad Layout", "Timmappanapalya", "Tin Factory", "Town Hall", "Trinity circle", "Trinity Church", "Udaya Nagar", "Ullal Sat Town", "Ulsoor", "Uttarahalli", "Vaderahalli", "Valepura", "Varthur", "Varthur kodi", "Vasanthapura", "Veera Sagara", "Veerabhadra Nagar", "Veerabrjadra Nagar", "Venkatapura", "Vidhanasoudha", "Vidhanasoudha Layout", "Vidyaranyapura", "Vignana Nagar", "Vigneshwara Nagar", "Vijaya Nagar", "Vijaya Nagar East", "VijayaBank Layout", "Vijanapura", "Vinayaka Nagar", "Vishwapriya", "Vishwapriya Forum", "Viswanathanagenahalli", "Viveka Nagar", "Vivekananda Nagar", "Viveknagar", "Vittal Nagar", "Vydehi Hospital", "Wagata", "Water Tank", "Weavers colony", "Whitefield", "White Field", "Wilson Garden", "WIPRO", "Yarappanahalli", "Yelahanka", "Yelahanka New Town", "Yelahanka ST 4 Ph", "Yelahanka ST 5 Ph", "Yelahanka Satellite Town", "Yelahanka Sat Town", "Yeshwantpur", "Yeshawanthpura Rly Station"
+                ]
+        };
+
+        const calculateFare = (route, fromIndex, toIndex) => {
+            const stages = toIndex - fromIndex;
+            const baseFare = route.type.includes('AC') ? 20 : 10;
+            const farePerStage = route.farePerStage || 5;
+            return `₹${baseFare + (stages > 1 ? (stages - 1) * farePerStage : 0)}`;
+        };
+
+        // --- UI Components ---
+        const findDirectRoutesFromCache = (origin, destination) => {
+            const directRoutes = [];
+            const originLower = origin.toLowerCase();
+            const destinationLower = destination.toLowerCase();
+            for (const route of bmtcData.routes) {
+                const stopsLower = route.stops.map(stop => stop.toLowerCase());
+                const fromIndex = stopsLower.indexOf(originLower);
+                const toIndex = stopsLower.indexOf(destinationLower);
+                if (fromIndex !== -1 && toIndex !== -1 && fromIndex < toIndex) {
+                    const journeyFare = calculateFare(route, fromIndex, toIndex);
+                    directRoutes.push({ route, from: origin, to: destination, journeyFare });
+                }
+            }
+            return directRoutes;
+        };
+        
+        // This function is unchanged but included for context.
+
+        // --- UI Components ---
+        const Card = ({ children, className = '' }) => <div className={`bg-white rounded-xl shadow-lg overflow-hidden ${className}`}>{children}</div>;
+        const CardContent = ({ children, className = '' }) => <div className={`p-4 md:p-6 ${className}`}>{children}</div>;
+        const Button = ({ children, onClick, className = '', variant = 'primary', disabled = false }) => {
+            const baseClasses = 'px-6 py-3 rounded-lg font-semibold focus:outline-none focus:ring-4 focus:ring-offset-0 transition-all duration-300 ease-in-out inline-flex items-center justify-center shadow-md hover:shadow-lg';
+            const variantClasses = {
+                primary: 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-300',
+            };
+            const disabledClasses = 'bg-gray-400 text-gray-600 cursor-not-allowed shadow-inner';
+            return <button onClick={onClick} disabled={disabled} className={`${baseClasses} ${disabled ? disabledClasses : variantClasses[variant]} ${className}`}>{children}</button>;
+        };
+
+        // --- Custom Components ---
+        const AutocompleteInput = ({ value, onChange, placeholder, stopList }) => {
+            const [suggestions, setSuggestions] = React.useState([]);
+            const wrapperRef = React.useRef(null);
+            React.useEffect(() => {
+                const handleClickOutside = (event) => { if (wrapperRef.current && !wrapperRef.current.contains(event.target)) setSuggestions([]); };
+                document.addEventListener('mousedown', handleClickOutside);
+                return () => document.removeEventListener('mousedown', handleClickOutside);
+            }, []);
+            const handleChange = (e) => {
+                const inputValue = e.target.value;
+                onChange(inputValue);
+                if (inputValue.length > 1 && stopList.length > 0) {
+                    setSuggestions(stopList.filter(stop => stop.toLowerCase().includes(inputValue.toLowerCase())).slice(0, 7));
+                } else {
+                    setSuggestions([]);
+                }
+            };
+            return (
+                <div className="relative w-full" ref={wrapperRef}>
+                    <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+                    <input type="text" value={value} onChange={handleChange} placeholder={placeholder} className="w-full p-4 pl-12 border-2 border-gray-200 rounded-lg bg-white focus:border-red-500 transition-colors duration-200" />
+                    {suggestions.length > 0 && (
+                        <ul className="absolute z-10 w-full bg-white border border-gray-200 rounded-md mt-1 shadow-lg max-h-60 overflow-y-auto">
+                            {suggestions.map((s, i) => <li key={i} onClick={() => { onChange(s); setSuggestions([]); }} className="px-4 py-3 cursor-pointer hover:bg-gray-100 transition-colors duration-150">{s}</li>)}
+                        </ul>
+                    )}
+                </div>
+            );
+        };
+
+        const AiRouteSuggestionCard = ({ suggestion, isLoading }) => {
+            if (isLoading) {
+                return (
+                    <Card className="mb-4 border-2 border-dashed border-blue-300 bg-blue-50/50">
+                        <CardContent>
+                            <div className="flex items-center gap-3 mb-4">
+                                <BrainCircuit className="h-8 w-8 text-blue-500"/>
+                                <div><h3 className="text-lg font-bold text-blue-800">AI Route Suggestion</h3><p className="text-xs text-gray-500">Powered by Gemini</p></div>
+                            </div>
+                            <div className="flex items-center text-gray-600">
+                                <Loader2 size={20} className="mr-3" />
+                                <p>Searching for the best routes, fares, and types...</p>
+                            </div>
+                        </CardContent>
+                    </Card>
+                );
+            }
+            if (!suggestion || !suggestion.legs || suggestion.legs.length === 0) {
+                return (
+                    <Card>
+                        <CardContent className="text-center text-gray-600 py-12">
+                            <XCircle className="mx-auto h-12 w-12 text-red-400 mb-4"/>
+                            <p className="font-semibold text-lg">No Routes Found by AI</p>
+                            <p className="text-sm mt-1">{ (suggestion && suggestion.summary) ? suggestion.summary : "The AI could not find a route. Please try again."}</p>
+                        </CardContent>
+                    </Card>
+                );
+            }
+            return (
+                <Card className="mb-4 border-2 border-dashed border-blue-300 bg-blue-50/50">
+                    <CardContent>
+                        <div className="flex justify-between items-start mb-4">
+                            <div>
+                                <h3 className="text-lg font-bold text-blue-800">AI Route Suggestion</h3>
+                                <p className="text-xs text-gray-500">Powered by Gemini</p>
+                            </div>
+                            {suggestion.totalFare && (
+                                <div className="text-right">
+                                    <p className="text-lg font-bold text-green-600">{suggestion.totalFare}</p>
+                                    <p className="text-xs text-gray-500">Total Est. Fare</p>
+                                </div>
+                            )}
+                        </div>
+                        <div className="space-y-4">
+                            {suggestion.legs.map((leg, index) => (
+                                <div key={index}>
+                                    {index > 0 && (
+                                        <div className="pl-8 py-3 relative border-l-2 border-dashed border-gray-300 ml-8">
+                                            <GitCommit className="absolute -left-[13px] top-1/2 -translate-y-1/2 h-6 w-6 text-red-500 bg-white"/>
+                                            <p className="font-bold text-red-600">Change bus at {suggestion.legs[index - 1].to}</p>
+                                        </div>
+                                    )}
+                                    <div className="p-3 bg-gray-50 rounded-lg">
+                                        <p className="font-bold text-gray-800 text-lg mb-2">{leg.from} <ArrowRight className="inline-block mx-1" size={16}/> {leg.to}</p>
+                                        <div className="space-y-2">
+                                            {leg.options.map((opt, optIndex) => (
+                                                <div key={optIndex} className="flex gap-3 p-2 bg-white rounded-md shadow-sm">
+                                                    <div className="flex-shrink-0 flex items-center justify-center w-12 h-12 rounded-lg bg-gray-200">
+                                                        <Bus className="h-6 w-6 text-gray-600"/>
+                                                    </div>
+                                                    <div className="flex-grow">
+                                                        <span className="font-semibold text-red-600">{opt.busNumbers.join(' or ')}</span>
+                                                        <span className={`ml-2 px-2 py-0.5 rounded-full text-xs font-medium ${opt.busType.toLowerCase().includes('ac') ? 'bg-blue-100 text-blue-800' : 'bg-red-100 text-red-800'}`}>{opt.busType}</span>
+                                                    </div>
+                                                    <div className="text-right flex-shrink-0">
+                                                        <p className="font-semibold text-gray-700">{opt.fare}</p>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                        {suggestion.summary && <p className="mt-4 pt-4 border-t text-sm text-gray-600 bg-gray-50 p-3 rounded-md">{suggestion.summary}</p>}
+                        <div className="mt-4 text-center text-xs text-amber-700 bg-amber-100 p-2 rounded-md">
+                            <p><strong>Note:</strong> AI-generated routes are suggestions. Please verify bus numbers with a real-time app for best results.</p>
+                        </div>
+                    </CardContent>
+                </Card>
+            );
+        };
+
+        const OfflineRouteCard = ({ routeInfo }) => {
+            const { route, from, to, journeyFare } = routeInfo;
+            return (
+                <Card className="mb-4">
+                    <CardContent>
+                        <div className="flex gap-4">
+                            <div className="flex-shrink-0 flex items-center justify-center w-16 h-16 rounded-lg bg-gray-200">
+                                <Bus className="h-8 w-8 text-gray-600"/>
+                            </div>
+                            <div className="flex-grow">
+                                <p className="font-bold text-gray-800 text-lg">{from} <ArrowRight className="inline-block mx-1" size={16}/> {to}</p>
+                                <div className="flex items-center gap-4 mt-1 text-sm">
+                                    <span className="font-semibold text-red-600">{route.busNumber}</span>
+                                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${route.type.toLowerCase().includes('ac') ? 'bg-blue-100 text-blue-800' : 'bg-red-100 text-red-800'}`}>{route.type}</span>
+                                </div>
+                            </div>
+                            <div className="text-right flex-shrink-0">
+                                <p className="font-semibold text-gray-700">{journeyFare}</p>
+                                <p className="text-xs text-gray-500">Est. Fare</p>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+            );
+        };
+
+
+        // --- Main Application Component (Modified) ---
+        function App() {
+            const [from, setFrom] = React.useState('');
+            const [to, setTo] = React.useState('');
+            const [isAiSearching, setIsAiSearching] = React.useState(false);
+            const [aiSuggestion, setAiSuggestion] = React.useState(null);
+            const [offlineRoutes, setOfflineRoutes] = React.useState([]);
+            const [error, setError] = React.useState('');
+            const [allStops, setAllStops] = React.useState([...new Set(bmtcData.stops)].sort());
+
+            // --- KEY CHANGE 1: API Key Pool ---
+            // WARNING: Do NOT expose API keys in client-side code in a real application.
+            // Use a backend proxy or serverless function to protect your keys.
+            // Add multiple keys to this array to increase request capacity.
+            const apiKeys = [
+                "AIzaSyA-FfPzdQSAoWF40GaGQyhhU4X9QKDraKU",
+                "sk-121108a0206742e183e4cee189feb8f4",
+                // "REPLACE_WITH_A_SECOND_API_KEY",
+                // "REPLACE_WITH_A_THIRD_API_KEY",
+            ];
+            const [currentKeyIndex, setCurrentKeyIndex] = React.useState(0);
+            
+            // --- KEY CHANGE 2: Updated AI Route Suggestion Logic ---
+            const getAiRouteSuggestion = async (origin, destination) => {
+                setIsAiSearching(true);
+                setAiSuggestion(null);
+                setOfflineRoutes([]);
+                setError('');
+
+                const prompt = `Act as a Bengaluru BMTC transport expert. Find the most accurate bus route from "${origin}" to "${destination}". CRITICAL: Bus numbers must be accurate and match official sources like Google Maps or the Namma BMTC app. Provide a concise list of the top 3-5 most common/direct bus routes. DO NOT list every single possible bus number. Your response MUST be a valid JSON object and nothing else. The JSON must have this structure: {"journeyType": "direct" | "connecting" | "not_found", "totalFare": "e.g., ₹50-₹70", "legs": [{"leg": 1, "from": "Start", "to": "End/Interchange", "options": [{"busNumbers": ["500CA"], "busType": "AC Vajra", "fare": "e.g., ₹50"}, {"busNumbers": ["500C"], "busType": "Ordinary", "fare": "e.g., ₹25"}]}], "summary": "Brief summary."}`;
+                
+                let successful = false;
+
+                // Loop through all available API keys until one succeeds.
+                for (let i = 0; i < apiKeys.length; i++) {
+                    const keyIndex = (currentKeyIndex + i) % apiKeys.length;
+                    const currentApiKey = apiKeys[keyIndex];
+                    
+                    // Skip if the placeholder key hasn't been replaced.
+                    if (currentApiKey.includes("REPLACE_WITH")) {
+                        console.warn(`Skipping invalid API key at index ${keyIndex}. Please replace it.`);
+                        continue;
+                    }
+
+                    try {
+                        const payload = {
+                            contents: [{ role: "user", parts: [{ text: prompt }] }],
+                            generationConfig: { responseMimeType: "application/json" }
+                        };
+                        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${currentApiKey}`;
+                        
+                        const response = await fetch(apiUrl, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+
+                        // If a key is rate-limited (429), just try the next one.
+                        if (response.status === 429) {
+                            console.warn(`API Key at index ${keyIndex} is rate-limited. Trying next key.`);
+                            continue; // Move to the next key
+                        }
+
+                        if (!response.ok) {
+                            throw new Error(`API request failed with status ${response.status}`);
+                        }
+
+                        const result = await response.json();
+                        
+                        if (result.candidates && result.candidates[0]?.content?.parts[0]?.text) {
+                            const parsedJson = JSON.parse(result.candidates[0].content.parts[0].text);
+                            setAiSuggestion(parsedJson);
+                            setError('');
+                            setCurrentKeyIndex(keyIndex); // Remember the last working key for the next search
+                            successful = true;
+                            break; // Exit the loop on success
+                        } else {
+                            throw new Error("Invalid response from AI.");
+                        }
+                    } catch (err) {
+                        console.error(`Attempt with key index ${keyIndex} failed:`, err);
+                        // The loop will automatically proceed to the next key.
+                    }
+                }
+
+                setIsAiSearching(false);
+
+                // This block runs if the loop completes without a successful API call.
+                if (!successful) {
+                    setError("AI service is busy. Searching offline cache...");
+                    const cachedRoutes = findDirectRoutesFromCache(origin, destination);
+                    setOfflineRoutes(cachedRoutes);
+                    
+                    if (cachedRoutes.length === 0) {
+                        setError("AI service is unavailable and no direct routes were found in the offline cache.");
+                    } else {
+                        setError("AI service unavailable. Showing results from offline cache.");
+                    }
+                }
+            };
+            
+            const handleSearch = () => {
+                if (!from || !to || from.trim().toLowerCase() === to.trim().toLowerCase()) {
+                    setError("Please enter a valid and different origin and destination.");
+                    return;
+                }
+                getAiRouteSuggestion(from.trim(), to.trim());
+            };
+
+            return (
+                <div className="min-h-screen">
+                    <header className="bg-red-600 text-white shadow-lg sticky top-0 z-20">
+                        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
+                            <div className="flex items-center gap-3">
+                                <BrainCircuit size={32} />
+                                <h1 className="text-xl sm:text-2xl font-bold tracking-tight">Namma BMTC AI Mitra</h1>
+                            </div>
+                        </div>
+                    </header>
+                    
+                    <main className="container mx-auto p-4 md:p-6 max-w-3xl">
+                        <Card className="mb-6">
+                            <CardContent>
+                                <h2 className="text-2xl font-bold text-gray-800 mb-1">Plan Your Journey with AI</h2>
+                                <p className="text-gray-500 mb-4">Get live bus route information for Bengaluru.</p>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center mb-4">
+                                    <AutocompleteInput
+                                        value={from}
+                                        onChange={setFrom}
+                                        placeholder={"Enter Origin"}
+                                        stopList={allStops}
+                                    />
+                                    <AutocompleteInput
+                                        value={to}
+                                        onChange={setTo}
+                                        placeholder={"Enter Destination"}
+                                        stopList={allStops}
+                                    />
+                                </div>
+                                <Button onClick={handleSearch} className="w-full text-lg" disabled={isAiSearching}>
+                                    {isAiSearching ? <><Loader2 className="mr-2"/> AI is Searching...</> : <><Search size={20} className="mr-2"/>Find Buses with AI</>}
+                                </Button>
+                                {error && <p className="text-red-600 text-sm mt-3 text-center font-medium">{error}</p>}
+                            </CardContent>
+                        </Card>
+
+                        {isAiSearching && <AiRouteSuggestionCard isLoading={true} />}
+                        
+                        {!isAiSearching && aiSuggestion && <AiRouteSuggestionCard suggestion={aiSuggestion} isLoading={false} />}
+
+                        {!isAiSearching && offlineRoutes.length > 0 && (
+                            <Card className="mb-4 border-2 border-dashed border-amber-400 bg-amber-50/50">
+                                <CardContent>
+                                    <div className="flex items-center gap-3 mb-4">
+                                        <Database className="h-8 w-8 text-amber-600"/>
+                                        <div><h3 className="text-lg font-bold text-amber-800">Offline Cache Results</h3><p className="text-xs text-gray-500">AI service was unavailable. These routes may be outdated.</p></div>
+                                    </div>
+                                    <div className="space-y-2">
+                                        {offlineRoutes.map(r => <OfflineRouteCard key={r.route.id} routeInfo={r} />)}
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        )}
+
+                    </main>
+
+                    <footer className="text-center py-8 text-xs text-gray-500 mt-8 bg-gray-100">
+                        <div className="flex items-center justify-center gap-2">
+                            <AlertTriangle size={14}/>
+                            <p><strong>Disclaimer:</strong> This is a concept app. AI data is for informational purposes and may not be 100% accurate.</p>
+                        </div>
+                        <p className="mt-2">Always verify critical travel information.</p>
+                    </footer>
+                </div>
+            );
+        }
+        // --- RENDER THE APP ---
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(
+        <React.StrictMode>
+            <App />
+        </React.StrictMode>
+        );
+
+    </script>
+</body>
+</html>
